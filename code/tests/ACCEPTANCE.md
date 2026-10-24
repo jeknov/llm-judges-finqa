@@ -24,7 +24,9 @@ GPU, API or later-milestone part remains, noted in the last column), `pending` (
 | S1-13 | stable_seed equal across processes; no module calls built-in hash | implemented | |
 | S1-14 | build_messages snapshot tests, 10 items per format | implemented | |
 | S1-15 | No #neg answer matches its gold, incl. zero-valued and boolean cases | implemented | |
-| S1-16 | MockJev and the real client pass the same interface test | partial | real client pending TypeSafe docs; interface test runs on MockJev and a fake real backend |
+| S1-16 | MockJev and the real client pass the same interface test: argument types, one P(yes) in [0, 1] per question ID, same handling of a 429 with retry-after | partial | real client tested against a fake HTTP endpoint with test-only response fields; the real field names must come from TypeSafe's API reference |
+| S1-17 | Every scored item has exactly one batched six-question request in jev_requests.parquet (three if repeats), answers mapped to the right question IDs | implemented | on MockJev; `api` run pending |
+| S1-18 | Batched-versus-single-question check on 200 items recorded; full run used the selected mode | partial | logic and both outcomes tested on mocks; the real 200-item check is `api` |
 | S2-01 | Every item has one row; S non-null for pool items | pending | M4 |
 | S2-02 | Answer-span assertion passes or boundary adjusted and logged; < 1% adjusted | pending | M4 |
 | S2-03 | vLLM and fp32 Transformers NLL within 0.05 nats on 200 items | pending | M4, `gpu` |

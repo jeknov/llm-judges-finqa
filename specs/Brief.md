@@ -119,7 +119,7 @@ Each subsection gives what a stage must produce and the parameters that are easi
 - **Verification.** Port the official FinQA executor; evaluate TAT-QA derivations with an AST whitelist, never `eval`. Unverified items are excluded; FinanceBench gets `verified = null`.
 - **Q3 checks.** One consequence statement per pool item, true whenever the answer is true: templates keyed on the program's final operation (subtract → direction, divide → ratio vs 1, add → total exceeds the largest addend, and so on), with a strong-LLM fallback under a JSON schema. Validated on 100 items, accepted at ≥ 90%.
 - **Negatives.** 1,000 `#neg` copies with wrong answers (×{0.5, 0.8, 1.25, 2}, sign flip, boolean flip, or span swap), with regenerated Q3 checks.
-- **Jev.** Six frozen yes/no questions per pool item and negative. R = P(yes | Q1); I = mean of P(yes | Q2) and P(yes | Q3); V = R × I; indecision = max binary entropy. Same for the paraphrase battery. Cache keyed on SHA-256 of (model version, prompt, options).
+- **Jev.** Six frozen yes/no (noul) questions per pool item and negative, sent in one batched request per item: `jev_ask(state, questions)` posts the `judge` rendering once as the state, with question IDs `q1`, `q2`, `q3`, `q1p`, `q2p`, `q3p`, to `/v1/systemone` with `jev.model` pinned to `jev-1.13.0`. Billing is per input token, so batching bills the state once instead of six times. R = P(yes | Q1); I = mean of P(yes | Q2) and P(yes | Q3); V = R × I; indecision = max binary entropy. Same for the paraphrase battery. Cache keyed on SHA-256 of (model ID, state, canonical JSON of questions); `429` retried honouring `retry-after`. A 200-item check confirms batched and single-question answers agree, otherwise every question is sent alone; `jev_requests.parquet` tracks input tokens per request.
 
 ### Spec 2 — Base-model surprisal
 
@@ -196,7 +196,7 @@ Each milestone ends with its tests passing on the tiny profile; full-scale runs 
 
 1. **Foundation.** Package skeleton, Hydra configs, `io.py` with pandera schemas, `ids.py`, `match.py`, `prompts.py`, the mock clients, and the CI harness with the smoke-test scaffold.
 2. **Data, Spec 1 without Jev.** Loaders for FinQA, TAT-QA and FinanceBench; dedup and leakage removal; the token budget; splits; the executor and evaluator; Q3 templates and the LLM fallback; negatives.
-3. **Jev scoring.** Client with caching, the determinism check, aggregation into R and I. Run on the tiny profile against `MockJev` first.
+3. **Jev scoring.** Batched client with caching and `retry-after` handling, the determinism and batching checks, aggregation into R and I. Run on the tiny profile against `MockJev` first.
 4. **Base-model scoring, Spec 2.** `answer_nll` with the span logic, sampling, extraction, the S percentile.
 5. **E0 and gates, Spec 3.** Comparators, A1–A6, gates D1–D4, the frame, the H1 verdict.
 6. **Proxies, Spec 4.** `compute_influence` with its sanity checks, then `run_condition`, including `demo_plan`.
@@ -218,7 +218,7 @@ The specs refine protocol v1 in documented places; the full table, with reasons,
 **Open items, blocking: confirm before coding the dependent stage.**
 
 - [ ] FinQA, TAT-QA and FinanceBench field names against the downloaded files; whether TAT-QA test gold answers are public (Spec 1).
-- [ ] Jev request format, model version string, and how options are passed, from TypeSafe's documentation (Spec 1).
+- [ ] From TypeSafe's API reference: the response field holding a noul answer's probability, and whether the per-request token overhead (about 260 tokens) is billed as measured; `jev.model` pinned to `jev-1.13.0` or a later versioned ID chosen before scoring starts (Spec 1).
 - [ ] `model.base`: an open 7–8B instruct checkpoint, not finance-tuned, with a context of at least 16,384 tokens and a chat template whose reasoning mode can be switched off; record the revision hash (Spec 2).
 - [ ] `model.strong`: a frontier API model with structured output (Specs 1, 3).
 - [ ] The pysbd version, and its agreement with FinQA sentence indices on 50 items per dataset (Spec 6).

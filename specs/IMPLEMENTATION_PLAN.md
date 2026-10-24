@@ -157,7 +157,7 @@ jev-workshop-paper/
 - [x] `record_verdict` upsert: rerunning does not duplicate rows (S5)
 
 **clients**
-- [x] `MockJev` and a fake real backend pass the same interface test (S1); probabilities sum to 1 ± 1e-6
+- [x] `MockJev` and the real client on a fake HTTP endpoint pass the same interface test (S1-16)
 - [ ] The real Jev client passes the same interface test (blocked: TypeSafe docs)
 - [x] (added) Cache: second identical call makes no network request (counted via a fake transport); changing model version changes the key
 
@@ -230,21 +230,32 @@ jev-workshop-paper/
 ---
 
 ## M3 — Jev scoring: `jev`
-**Status (2026-10-23): done against `MockJev`.** The real client is blocked on TypeSafe's API documentation (external facts #2).
+**Status (2026-10-23): done against `MockJev`; reworked the same day for batched requests** (Spec 1 change to cut TypeSafe cost: one request per item carrying all six questions). The real client is written to the Spec 1 request format and tested against a fake HTTP endpoint; it refuses to run until the response field names and the authentication header are taken from TypeSafe's API reference (external facts #2).
+- [x] `jev_ask(state, questions)`: one `POST /v1/systemone` per item, state = `judge` rendering, six noul questions `q1 q2 q3 q1p q2p q3p`, `jev.model` pinned to `jev-1.13.0`
+- [x] Cache keyed on SHA-256 of (model ID, state, canonical JSON of questions); `429` retried with backoff honouring `retry-after`; request IDs and `usage.input_tokens` logged
 - [x] Tiny profile against `MockJev`
-- [ ] Real Jev client per TypeSafe docs (blocked)
-- [x] Six questions × (pool + negatives); determinism check on 200 items
+- [ ] Real Jev client run (blocked: response field names and auth header from TypeSafe's API reference)
+- [x] Determinism check (200 items scored twice, batched) and batching check (same items, one question per request); mode recorded in `results/jev_manifest.json`
+- [x] Outputs: `jev_scores_long` (+ `batched`, `request_id`), `jev_requests` (one row per request, input tokens), `jev_scores`
 - [x] Aggregate R, I, V, indecision (+ para)
 
 ### M3 tests
-- [x] Every pool item and negative has six rows with probabilities summing to 1 ± 1e-6 (S1)
-- [x] All probabilities in [0, 1]; no pool item has null R or I (S1)
+- [x] Every pool item and negative has six rows with probabilities summing to 1 ± 1e-6 (S1-08)
+- [x] All probabilities in [0, 1]; no pool item has null R or I (S1-09)
+- [x] MockJev and the real client (on a fake endpoint): same arguments, one P(yes) per question ID, same handling of a `429` with `retry-after` (S1-16)
+- [x] Exactly one six-question request per scored item in `jev_requests` (three under triplicate); answers mapped to the right question IDs (S1-17)
+- [x] Batching check recorded; full run uses the selected mode, tested for both outcomes (S1-18)
+- [x] (added) Request body matches the Spec 1 format exactly; the request carries the configured auth header
+- [x] (added) Mock answers do not depend on batching; batched requests cost under half the input tokens of single-question requests
+- [x] (added) Cache key covers model ID, state and questions (order-independent); repeats are re-sent; cached responses keep request ID and tokens
+- [x] (added) Repeat rounds are sent sequentially, so request IDs are reproducible (found by the end-to-end test)
 - [x] (added) Determinism-check logic tested with a mock that injects noise above and below 0.01
-- [ ] (`api`) Determinism check on the real API: 200 items scored twice; > 0.01 mean abs diff → triplicate mode (S1)
+- [ ] (`api`) Determinism and batching checks on the real API, 200 items (S1-18)
 - [x] (added) Prompt snapshot: `jev_battery.yaml` matches the Spec 1 wording character for character
 - [x] (added) Aggregation on a fixture with hand-computed R, I, V, indecision; binary entropy(0.5) = 1 bit
-- [x] (added) A `#neg` prompt contains the wrong answer and its regenerated check, never the gold
+- [x] (added) A negative's state contains the wrong answer; q3/q3p carry its regenerated check
 - [x] (added) Re-running with a warm cache sends zero requests
+- [x] (added) `fqsel check` verifies request accounting across `jev_scores_long` and `jev_requests`
 
 ---
 
@@ -420,7 +431,7 @@ The `e3` stage exists as a placeholder from M0 and is filled in here.
 
 **External facts still needed** (asked at the milestone shown)
 1. Model choices: `model.base` (7–8B instruct, ≥ 16k context, reasoning switchable off, revision hash), `model.strong`, and the ~0.5B tiny-profile model. *(base tokenizer: needed for a full-size real-data pool build; tiny model and base: M4; strong: before any real Q3 fallback run)*
-2. Jev / TypeSafe API docs (request format, model version, option passing). *(real `jev` run)*
+2. From TypeSafe's API reference: the response fields for a noul answer's probability, the request ID and the reported model ID, the authentication header (`jev.api.*` placeholders), and whether the ~260-token per-request overhead is billed as measured. The request format and the pinned model (`jev-1.13.0`) are now fixed in Spec 1. *(real `jev` run)*
 3. ~~Raw data field names; TAT-QA test gold availability~~ — resolved 2026-10-23: confirmed against the downloaded files; TAT-QA test gold is public.
 
 **Placeholders: values the specs leave blank** (kept as `???` until the owner decides)
@@ -477,6 +488,8 @@ Real-data, GPU, API and human checks, recorded as they are run. One row per chec
 | 2026-10-23 | no-commit | Tiny pipeline on real data: pool → verify → q3 → jev → check | tiny | 248 rows (20 negatives), 140 Q3 checks (98 template, 42 LLM), 840 Jev rows; `check: OK` | yes | toy tokenizer, mock clients |
 | 2026-10-23 | no-commit | Exact leakage check on the tiny real-data build (S1-03) | tiny | no pool item ≥ 0.9 Jaccard with probe/test | yes | inverted shingle index, independent of MinHash |
 | 2026-10-23 | no-commit | Full test suite | tiny | 325 passed (6 real_data/gpu deselected); ruff clean | yes | `pytest -q` |
+| 2026-10-23 | 53ef30d+ | Batched Jev stage on the tiny real-data build | tiny | 140 items → 140 six-question requests; batching check: batched = single (mode batched); `check: OK` | yes | MockJev; token counts are mock estimates |
+| 2026-10-23 | 53ef30d+ | Full test suite after the batching change | tiny | 332 passed; ruff clean; e2e and Jev tests stable over 8 repeats | yes | |
 
 ## Owner decisions log
 
@@ -497,3 +510,5 @@ Real-data, GPU, API and human checks, recorded as they are run. One row per chec
 | 2026-10-23 | Span and count presence check | Case-insensitive, whitespace- and curly-quote-normalised (strict matching gave 97.98% vs the 99% target) |
 | 2026-10-23 | TAT-QA accounting negatives | A parenthesised bare number in a derivation is negative, "(6,919)" → −6919 |
 | 2026-10-23 | Table-op Q3 templates | Templates win for any program ending in a templated op, including FinQA table-op (lookup) items |
+| 2026-10-23 | Jev cost reduction (Spec 1 edit) | One batched request per item with all six questions; `jev.model` pinned to `jev-1.13.0`; batching verified against single-question requests on 200 items |
+| 2026-10-23 | Jev model version | `jev-1.13.0` confirmed for the whole study (no later version); fixed before any real scoring |

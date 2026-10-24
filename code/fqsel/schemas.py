@@ -171,10 +171,26 @@ TABLES: dict[str, TableDef] = {
             "p_no": Col("float", unit_interval=True),
             "entropy_bits": Col("float", unit_interval=True),
             "n_calls": Col("int"),
+            "batched": Col("bool"),
             "jev_model_version": Col("str", nonempty=True),
+            "request_id": Col("str", nonempty=True),   # ";"-joined when n_calls > 1
             "timestamp": Col("str"),
         },
         unique=("item_id", "battery", "question"),
+    ),
+    # One row per request that produced the stored scores, for cost tracking. Requests made only by the
+    # determinism and batching checks are totalled in results/jev_manifest.json instead.
+    "jev_requests": TableDef(
+        "scores/jev_requests.parquet",
+        {
+            "request_id": Col("str", nonempty=True),
+            "item_id": Col("str", nonempty=True),
+            "n_questions": Col("int"),
+            "input_tokens": Col("int"),
+            "jev_model_version": Col("str", nonempty=True),
+            "timestamp": Col("str"),
+        },
+        unique=("request_id",),
     ),
     "jev_scores": TableDef(
         "scores/jev_scores.parquet",

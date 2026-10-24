@@ -170,9 +170,9 @@ Every pool item and validation negative gets exactly one check (probe and test i
 
 Jev scores every pool item and every validation negative on six questions: the battery Q1–Q3 and its paraphrase Q1′–Q3′. R and I are computed from the stored probabilities; nothing downstream calls Jev again except Spec 6.
 
-**Client interface.** Wrap Jev behind one function, `jev_decide(prompt: str, options: list[str]) -> dict[str, float]`, returning a probability per option that sums to 1. The request format, model identifier, rate limits and how option definitions are passed must be taken from TypeSafe's current documentation; nothing here assumes them. The wrapper caches responses keyed by the SHA-256 of `(jev_model_version, prompt, options)`, retries with exponential backoff, and logs request IDs and cost.
+**Client interface.** Wrap Jev behind one function, `jev_ask(state: str, questions: dict[str, str]) -> dict[str, float]`, which sends one request to `POST https://api.typesafe.ai/v1/systemone` with body `{"model": "<jev.model>", "state": state, "questions": {qid: {"type": "noul", "instructions": text}, ...}}` and returns P(yes) for each question ID. Pin `jev.model` to a versioned ID (`jev-1.13.0`), never an alias, because aliases move to new releases and would change scores mid-study; record the versioned ID each response reports. Each item is scored in a single request carrying all six battery questions: Jev ingests the state once and answers every question against it in parallel, and the questions cannot see one another's answers, so batching does not couple them. Billing is per input token with output free, so one batched request costs roughly the state once plus six short questions, instead of the state six times. The wrapper caches responses keyed by the SHA-256 of `(model ID, state, canonical JSON of questions)`, retries `429` responses with exponential backoff that honours `retry-after`, and logs request IDs and `usage.input_tokens`. The response field holding a noul answer's probability must be taken from TypeSafe's API reference; nothing here assumes its name.
 
-**Prompts.** Each prompt is the `judge` rendering of the item, followed by the question. Options are `["yes", "no"]` for all six questions. The wording below is frozen before any score is looked at; changing it invalidates all scores. Q1–Q3 reproduce the v0 battery wording of protocol v1 verbatim, apart from the `{check_text}` placeholder Q3 needs, so a change here is also a change to the pre-registered battery. Q1′–Q3′ have no protocol counterpart and are fixed here.
+**State and questions.** The state is the `judge` rendering of the item (context, question and stated answer), identical for all six questions. Each question below is sent as a noul question whose `instructions` are the wording in the table, with `{check_text}` filled from `q3_checks.parquet`. Question IDs are `q1`, `q2`, `q3`, `q1p`, `q2p`, `q3p`. P(no) is stored as 1 − P(yes). The wording is frozen before any score is looked at; changing it invalidates all scores.
 
 | Question | Construct | Wording |
 | --- | --- | --- |
@@ -192,7 +192,7 @@ Jev scores every pool item and every validation negative on six questions: the b
 
 Negatives get their Q3 check regenerated from the wrong answer with the same rules, so that only Q1 should separate them from originals. They are scored on all six questions, used only in Spec 3, and never enter any selection condition.
 
-**Determinism check.** Before the full run, score 200 items twice. If the mean absolute difference in P(yes) exceeds 0.01, score every item three times and store the mean.
+**Determinism and batching checks.** Before the full run, score 200 items twice in batched requests. If the mean absolute difference in P(yes) exceeds 0.01, score every item three times and store the mean. On the same 200 items, also score each question in its own single-question request, and confirm that batched and single-question probabilities differ by no more than the repeat difference plus 0.01. If they differ more, score all items one question per request and record the decision in the manifest.
 
 **Aggregation.** For each battery b ∈ {orig, para}:
 
@@ -203,7 +203,7 @@ Negatives get their Q3 check regenerated from the wrong answer with the same rul
 
 The original battery is primary; the paraphrase is used only for robustness analyses in Spec 3.
 
-**Outputs.** `jev_scores_long.parquet`, one row per item × battery × question: `item_id`, `battery`, `question`, `p_yes`, `p_no`, `entropy_bits`, `n_calls`, `jev_model_version`, `timestamp`. `jev_scores.parquet`, one row per item: `item_id`, `is_negative`, `R`, `I`, `V`, `indecision`, `R_para`, `I_para`, `V_para`, `indecision_para`.
+**Outputs.** `jev_scores_long.parquet`, one row per item × battery × question: `item_id`, `battery`, `question`, `p_yes`, `p_no`, `entropy_bits`, `n_calls`, `batched` (bool), `jev_model_version`, `request_id`, `timestamp`. `jev_requests.parquet`, one row per request: `request_id`, `item_id`, `n_questions`, `input_tokens`, `jev_model_version`, `timestamp`, used for cost tracking. `jev_scores.parquet`, one row per item: `item_id`, `is_negative`, `R`, `I`, `V`, `indecision`, `R_para`, `I_para`, `V_para`, `indecision_para`.
 
 ## Acceptance tests and open items
 
@@ -225,10 +225,12 @@ Spec 1 is done when every test below passes in CI and the open items are resolve
 * [ ] `stable_seed` returns the same value in two separate processes, and no module calls the built-in `hash` (enforced by a lint rule).
 * [ ] Snapshot tests of `build_messages` pass for 10 items in each format.
 * [ ] No `#neg` answer matches its gold under `answers_match`, including the zero-valued and boolean cases.
-* [ ] `MockJev` and the real client pass the same interface test: identical argument types, returned keys and probability sums.
+* [ ] `MockJev` and the real client pass the same interface test: identical argument types, one P(yes) in [0, 1] per question ID, and identical handling of a `429` with `retry-after`.
+* [ ] Every scored item has exactly one batched request with six questions in `jev_requests.parquet` (three if the determinism check triggered repeats), and the six answers map to the right question IDs.
+* [ ] The batched-versus-single-question check on 200 items is recorded, and the full run used the mode it selected.
 
 **Open items.**
 
 - Confirm the FinQA and TAT-QA field names against the downloaded files, and whether TAT-QA test gold answers are public.
-- Confirm the Jev request format, model version string and how options are defined, from TypeSafe's documentation.
+- Confirm in TypeSafe's API reference the response field that holds a noul answer's probability, and whether the per-request token overhead is billed as measured externally (about 260 tokens); pin `jev.model` to `jev-1.13.0` or a later versioned ID chosen before scoring starts.
 - Choose `model.strong` for Q3 fallback checks; it must support structured output.

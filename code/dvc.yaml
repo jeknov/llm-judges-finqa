@@ -16,7 +16,8 @@ stages:
   jev:
     cmd: python -m fqsel run jev profile=${profile}
     deps: [fqsel/stages/jev.py, prompts/jev_battery.yaml, data/pool.parquet, data/q3_checks.parquet]
-    outs: [scores/jev_scores_long.parquet, scores/jev_scores.parquet, results/jev_determinism.json]
+    outs: [scores/jev_scores_long.parquet, scores/jev_requests.parquet, scores/jev_scores.parquet,
+           results/jev_manifest.json]
   surprisal:
     cmd: python -m fqsel run surprisal profile=${profile}
     deps: [data/pool.parquet]

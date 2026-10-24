@@ -1,11 +1,22 @@
 # Spec 1, Jev battery scoring.
 battery_version: v0
-options: ["yes", "no"]          # quoted: bare yes/no are booleans in YAML
-model_version: ???               # OWNER DECISION PENDING — from TypeSafe documentation (external facts #2)
+model: jev-1.13.0                # pinned versioned ID, never an alias (Spec 1, Client interface)
+endpoint: https://api.typesafe.ai/v1/systemone
+question_type: noul
 determinism:
-  n_items: 200
+  n_items: 200                   # also the sample for the batched-versus-single-question check
   tolerance: 0.01
   repeats: 3
+batching_margin: 0.01            # batched may differ from single-question by the repeat difference + this
+# Response mapping and authentication must come from TypeSafe's API reference (Spec 1, Open items).
+api:
+  key_env: TYPESAFE_API_KEY      # environment variable holding the API key (operational)
+  auth_header: ???               # OWNER DECISION PENDING — header carrying the key, from the API reference
+  answers_field: ???             # OWNER DECISION PENDING — response field holding the per-question answers
+  probability_field: ???         # OWNER DECISION PENDING — field holding a noul answer's probability
+  request_id_field: ???          # OWNER DECISION PENDING — response field with the request ID
+  model_field: ???               # OWNER DECISION PENDING — response field with the reported versioned model ID
+  timeout_s: 120
 # Operational settings for the real client (not analysis parameters).
 retry:
   max_attempts: 6

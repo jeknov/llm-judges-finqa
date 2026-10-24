@@ -12,6 +12,27 @@ from fqsel.io import read_table, table_path
 from fqsel.schemas import TABLES
 
 
+def _request_problems(long: pd.DataFrame, reqs: pd.DataFrame) -> list[str]:
+    """Spec 1: each scored item has one batched six-question request per repeat (or six single-question
+    requests per repeat), and every request ID in the scores appears in jev_requests."""
+    problems = []
+    used = {r for ids in long["request_id"] for r in ids.split(";")}
+    if used != set(reqs["request_id"]):
+        problems.append("jev_requests: request IDs differ from those referenced by jev_scores_long")
+    n_calls = long.groupby("item_id")["n_calls"].first()
+    batched = bool(long["batched"].all())
+    if long["batched"].nunique() != 1:
+        problems.append("jev_scores_long: mixed batched and single-question rows")
+    expected_q = 6 if batched else 1
+    if (reqs["n_questions"] != expected_q).any():
+        problems.append(f"jev_requests: requests without exactly {expected_q} question(s)")
+    per_item = reqs.groupby("item_id").size()
+    expected = n_calls * (1 if batched else 6)
+    if not per_item.reindex(expected.index).fillna(0).astype(int).equals(expected.astype(int)):
+        problems.append("jev_requests: an item does not have the expected number of requests")
+    return problems
+
+
 def run_checks(cfg: DictConfig) -> list[str]:
     problems: list[str] = []
     tables: dict[str, pd.DataFrame] = {}
@@ -52,6 +73,9 @@ def run_checks(cfg: DictConfig) -> list[str]:
                 problems.append("jev_scores_long: p_yes + p_no differs from 1")
             if q3 is not None and set(long["item_id"]) != set(q3["item_id"]):
                 problems.append("jev_scores_long: scored items differ from items with a Q3 check")
+            reqs = tables.get("jev_requests")
+            if reqs is not None:
+                problems += _request_problems(long, reqs)
         verified = tables.get("verified")
         if verified is not None and set(verified["item_id"]) != ids:
             problems.append("verified: items differ from pool.parquet")

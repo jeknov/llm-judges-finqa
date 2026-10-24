@@ -34,7 +34,7 @@ def model_ids(cfg: DictConfig) -> dict[str, str]:
     return {
         "model.base": f"{base['name']}@{base['revision']}",
         "model.strong": f"{strong['name']}@{strong['version']}",
-        "jev": str(c["jev"]["model_version"]),
+        "jev": str(c["jev"]["model"]),
     }
 
 

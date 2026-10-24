@@ -4,7 +4,7 @@ Status as of 23 October 2026. Sources: [Protocol v1](<../specs/Protocol v1 (Trai
 
 ## Summary
 
-The code base (`code/`, package `fqsel`) is built up to milestone M3 of the Implementation Plan. That covers all of Spec 1: the item pool, verification, Q3 checks, validation negatives and Jev scoring. It also covers the shared infrastructure every later spec relies on. All 325 automated tests pass, and so do the checks on the downloaded data.
+The code base (`code/`, package `fqsel`) is built up to milestone M3 of the Implementation Plan. That covers all of Spec 1: the item pool, verification, Q3 checks, validation negatives and Jev scoring. It also covers the shared infrastructure every later spec relies on. All 332 automated tests pass, and so do the checks on the downloaded data.
 
 So far the pipeline has run only with a test-only toy model and mock Jev and strong-LLM clients. **No scientific measurement has been made yet:** no experiment has run on real scores, no hypothesis has been tested and no gate has been evaluated. The current R and I values come from `MockJev` and are placeholders.
 
@@ -25,14 +25,14 @@ So far the pipeline has run only with a test-only toy model and mock Jev and str
 
 | Spec | Protocol v1 step | What is implemented | What remains |
 | --- | --- | --- | --- |
-| [Spec 1 — Pool and Jev scoring](<../specs/Spec 1 — Pool Construction and Jev Scoring.md>) | Constructs R and I; verified correctness for E0 and E3 | All five stages' logic: loaders for FinQA, TAT-QA and FinanceBench; exclusions; exact and MinHash deduplication; stratified probe, fixed-demo and test splits; FinQA executor (port of the official one); TAT-QA evaluator; Q3 templates plus LLM fallback; 1,000 `#neg` validation negatives; six-question Jev battery with determinism check; R, I, V, indecision. 14 of 16 acceptance items fully automated | Human validation of Q3 checks (100 LLM checks; 50 per template); real Jev client (TypeSafe docs); full-size pool build (needs the `model.base` tokenizer) |
+| [Spec 1 — Pool and Jev scoring](<../specs/Spec 1 — Pool Construction and Jev Scoring.md>) | Constructs R and I; verified correctness for E0 and E3 | All five stages' logic: loaders for FinQA, TAT-QA and FinanceBench; exclusions; exact and MinHash deduplication; stratified probe, fixed-demo and test splits; FinQA executor (port of the official one); TAT-QA evaluator; Q3 templates plus LLM fallback; 1,000 `#neg` validation negatives; six-question Jev battery sent as one batched request per item (pinned model `jev-1.13.0`), with determinism and batching checks and per-request token tracking; R, I, V, indecision. 15 of 18 acceptance items fully automated | Human validation of Q3 checks (100 LLM checks; 50 per template); running the real Jev client (response field names and auth header from TypeSafe's API reference); full-size pool build (needs the `model.base` tokenizer) |
 | [Spec 2 — Surprisal](<../specs/Spec 2 — Base-Model Surprisal.md>) | Construct S; base-model accuracy | Prerequisites only: `build_messages` with the `direct` and `reason` formats, `extract_answer`, `answers_match`, and the HF and vLLM backends with token log-probabilities | `answer_nll`, sampling, S percentile (M4) |
 | [Spec 3 — Validity and gates](<../specs/Spec 3 — Validity Checks and Gates (E0).md>) | E0; H1; gates D1–D4 | Infrastructure: `results/gates.json` schema with locked, validated writes; start-up halt check on gated stages; the verdict recorder for `hypotheses.csv`; CSV annotation module reused by the 150-item audit | Comparators, analyses A1–A6, gate logic, analysis frame (M5) |
 | [Spec 4 — Proxies G and C](<../specs/Spec 4 — Value Proxies G and C.md>) | Value proxies G and C | Prompt assembler and backends that C will use; LoRA and projection settings entered in config (seeds are placeholders) | `compute_influence`, `run_condition` (M6) |
 | [Spec 5 — Main tests](<../specs/Spec 5 — Main Hypothesis Tests (E1, E2).md>) | E1, E2; H2, H3, H4, H6; gates D5, D6 | Verdict recorder; gated stages `e1`/`e2` registered with the halt check | Conditions, regressions, fixed-effects logit, bootstrap, figures (M7) |
 | [Spec 6 — E3](<../specs/Spec 6 — Reliability Gate and Causal Manipulation (E3).md>) | E3; H5 | `make_wrong_answer` and `generate_check(answer=…)` shared with Spec 1, as Spec 6 requires; `e3` stage registered with both halt checks (D5 override honoured) | Variants, manipulation check, paired tests (M8) |
 
-Every acceptance item in the six specs has an ID and a status in [`code/tests/ACCEPTANCE.md`](../code/tests/ACCEPTANCE.md): 15 implemented, 6 partial, 52 pending (73 in total).
+Every acceptance item in the six specs has an ID and a status in [`code/tests/ACCEPTANCE.md`](../code/tests/ACCEPTANCE.md): 16 implemented, 7 partial, 52 pending (75 in total).
 
 ## Experiments E0–E3
 
@@ -92,6 +92,7 @@ No hypothesis has a verdict yet. `results/hypotheses.csv` does not exist, and ve
 None of these alters a pre-registered threshold or hypothesis rule. All are owner decisions recorded in the Implementation Plan's decisions log.
 
 - **Human labeling:** CSV files sent to annotators and returned with labels, never Argilla. Spec 1 and the protocol text were updated to say so.
+- **Jev cost:** each item is scored in one batched request carrying all six questions, so the state is billed once instead of six times. A 200-item check against single-question requests guards against any coupling, and `jev.model` is pinned to `jev-1.13.0`. This is a Spec 1 change; the battery wording and aggregation are unchanged.
 - **Statistics:** Python only. The protocol's lme4 mixed models become the Spec 5 fixed-effects logit with a cluster bootstrap.
 - **Values the specs left blank, now decided:**
   - multiply-template rule (P2);
@@ -111,7 +112,7 @@ None of these alters a pre-registered threshold or hypothesis rule. All are owne
 **Blockers:**
 - Choice of `model.base` (needed for a full-size pool build and for M4).
 - Choice of `model.strong`.
-- TypeSafe Jev API documentation.
+- From TypeSafe's API reference: the response fields (noul probability, request ID, reported model) and the authentication header.
 - Approval of the Q3 fallback prompt.
 - Two annotators for the Q3 validation rounds.
 

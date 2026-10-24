@@ -16,7 +16,7 @@ import pytest
 from fqsel.cli import main
 from fqsel.stages import STAGES
 
-TIMESTAMP_COLUMNS = {"jev_scores_long.parquet": ["timestamp"]}
+TIMESTAMP_COLUMNS = {"jev_scores_long.parquet": ["timestamp"], "jev_requests.parquet": ["timestamp"]}
 
 
 def _run_all(root: Path, raw: Path, cache: Path) -> None:
@@ -43,7 +43,7 @@ def test_tiny_pipeline_twice_identical(tmp_path, synth_raw):
     out_a, out_b = _outputs(a), _outputs(b)
     assert out_a.keys() == out_b.keys()
     assert {"data/pool.parquet", "data/verified.parquet", "data/q3_checks.parquet",
-            "scores/jev_scores_long.parquet", "scores/jev_scores.parquet"} <= out_a.keys()
+            "scores/jev_scores_long.parquet", "scores/jev_requests.parquet", "scores/jev_scores.parquet"} <= out_a.keys()
     for rel in out_a:
         name = Path(rel).name
         if name in TIMESTAMP_COLUMNS:
