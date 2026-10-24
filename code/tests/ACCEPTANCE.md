@@ -35,7 +35,7 @@ GPU, API or later-milestone part remains, noted in the last column), `pending` (
 | S2-06 | Same seeds reproduce every acc | pending | M4 |
 | S2-07 | S uniform on [0, 1] within each dataset (KS p > 0.05) | pending | M4 |
 | S2-08 | answer_nll unit tests: toy 3-token sum exact; 20 hand-picked spans exact | pending | M4 |
-| S2-09 | Chat template renders no thinking/reasoning block | pending | M4 |
+| S2-09 | Chat template renders no thinking/reasoning block | implemented | `real_data`: OLMo 3 7B Instruct template at the pinned revision; neither format renders a reasoning block |
 | S2-10 | Sampling 20 items in a fresh process reproduces identical text | pending | M4 |
 | S3-01 | Comparators non-null for every pool item; judge_quality >= 99% | pending | M5 |
 | S3-02 | Self-consistency covers exactly the stored 3,000-item subsample | pending | M5 |

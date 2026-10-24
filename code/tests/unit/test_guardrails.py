@@ -107,7 +107,18 @@ def test_no_placeholders_for_real_runs(profile):
     with pytest.raises(PlaceholderError) as err:
         load_config([f"profile={profile}"])
     message = str(err.value)
-    assert "model.base.name" in message and "prompts/judge_quality.txt" in message
+    assert "proxy.lora.seed" in message and "prompts/judge_quality.txt" in message
+    assert "model.base" not in message  # decided 2026-10-23: OLMo 3 7B Instruct
+
+
+def test_model_base_is_pinned_to_a_commit():
+    """model.base must name one checkpoint at an exact commit, never a branch or tag (Spec 2)."""
+    from omegaconf import OmegaConf
+
+    base = OmegaConf.load(CODE_DIR / "conf" / "model" / "base.yaml")
+    assert base.name == "allenai/Olmo-3-7B-Instruct"
+    assert re.fullmatch(r"[0-9a-f]{40}", base.revision)
+    assert base.min_context >= 16384
 
 
 @pytest.mark.spec("S3-07")

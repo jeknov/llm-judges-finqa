@@ -4,7 +4,7 @@ Status as of 23 October 2026. Sources: [Protocol v1](<../specs/Protocol v1 (Trai
 
 ## Summary
 
-The code base (`code/`, package `fqsel`) is built up to milestone M3 of the Implementation Plan. That covers all of Spec 1: the item pool, verification, Q3 checks, validation negatives and Jev scoring. It also covers the shared infrastructure every later spec relies on. All 332 automated tests pass, and so do the checks on the downloaded data.
+The code base (`code/`, package `fqsel`) is built up to milestone M3 of the Implementation Plan. That covers all of Spec 1: the item pool, verification, Q3 checks, validation negatives and Jev scoring. It also covers the shared infrastructure every later spec relies on. All 333 automated tests pass, and so do the checks on the downloaded data. The base model is chosen: OLMo 3 7B Instruct (see below).
 
 So far the pipeline has run only with a test-only toy model and mock Jev and strong-LLM clients. **No scientific measurement has been made yet:** no experiment has run on real scores, no hypothesis has been tested and no gate has been evaluated. The current R and I values come from `MockJev` and are placeholders.
 
@@ -21,18 +21,56 @@ So far the pipeline has run only with a test-only toy model and mock Jev and str
 | M8 | Variants, manipulation check, paired tests | E3, H5 | Not started (stage exists as a placeholder) |
 | M9 | Full runs on the GPU node, paper outputs | Timeline weeks 1–3 | Not started |
 
+## Base model (`model.base`)
+
+**Decision (23 October 2026): OLMo 3 7B Instruct** ([`allenai/Olmo-3-7B-Instruct`](https://huggingface.co/allenai/Olmo-3-7B-Instruct), Ai2, Apache-2.0), pinned to revision `6e5971d9eba42665f5bd5a0fcf047f299ce1dccc` in `code/conf/model/base.yaml`. The choice was made before any real Jev score exists, so it cannot depend on results.
+
+**Role in the protocol.** `model.base` is the frozen learner whose adaptation the study is about.
+- It produces surprisal S and base-model accuracy (H1, H4, D2, D4), the PVI, ICL-reducible and IFD comparators (H1, the IFD baseline), and both value proxies, G and C (H2–H6, D5, D6).
+- R and I come from Jev and do not depend on it.
+
+**Why this model.**
+- **Contamination can be audited.** OLMo 3 is fully open: its pre- and post-training data are public. Whether FinQA, TAT-QA or FinanceBench items appear in its training corpora can therefore be checked directly, rather than argued. Contamination is the main threat to a surprisal-based study, because it would deflate S and inflate accuracy and both proxies.
+- **It meets every protocol constraint:**
+  - open weights and 7B parameters;
+  - instruct-tuned (the reasoning model is a separate "Think" variant);
+  - no finance-specific training;
+  - a 65,536-token context, well above the 16,384 required for four demonstrations plus a test item.
+- **It is reproducible.** Public weights, data and a fixed commit allow full replication.
+
+**Checks already run** (`pytest -m real_data`):
+- **Chat template:** at the pinned revision, it renders no reasoning block in either prompt format (Spec 2 acceptance S2-09).
+- **Token budget:** with the model's tokenizer, it excludes fewer than 1% of items per split. The worst cases are FinQA train (49 of 6,251) and TAT-QA dev (12 of 1,668).
+- **FinanceBench:** all 52 numeric items fit, so the out-of-distribution test keeps at least 50 items, as Spec 4 requires for hypothesis testing.
+
+**Facts to report or watch:**
+- **Default system prompt:** when no system message is given, the model's chat template inserts "You are a helpful function-calling AI assistant. You do not currently have access to any functions." The study uses the template unchanged, as Spec 2 requires.
+- **Extended context:** the 65K context is extended with YaRN from the 8,192 tokens the model was trained on. The longest demonstration prompts (up to about 12K tokens) rely on that extension.
+- **Llama 3.1 8B Instruct as a secondary model:** suggested as an exploratory robustness check of H4 under G only, not part of the pre-registered design.
+
+**Still to do before M4:**
+- the contamination audit against the released OLMo 3 training data;
+- a zero-shot accuracy comparison of FinQA dev against test;
+- checking PEFT and vLLM support on the GPU node.
+
+**Proposed sentence for the paper:**
+
+> We use OLMo 3 7B Instruct (revision `6e5971d`) as the frozen base model. It is a general-purpose instruct model with no finance-specific training, and because its full pre- and post-training data are public, we verified that no FinQA, TAT-QA or FinanceBench item appears in its training corpora (Appendix X). Its 64K-token context accommodates four in-context demonstrations for every test item.
+
+The verification claim in this sentence holds only once the contamination audit has been run and reported in the appendix.
+
 ## Correspondence to Specs 1–6
 
 | Spec | Protocol v1 step | What is implemented | What remains |
 | --- | --- | --- | --- |
-| [Spec 1 — Pool and Jev scoring](<../specs/Spec 1 — Pool Construction and Jev Scoring.md>) | Constructs R and I; verified correctness for E0 and E3 | All five stages' logic: loaders for FinQA, TAT-QA and FinanceBench; exclusions; exact and MinHash deduplication; stratified probe, fixed-demo and test splits; FinQA executor (port of the official one); TAT-QA evaluator; Q3 templates plus LLM fallback; 1,000 `#neg` validation negatives; six-question Jev battery sent as one batched request per item (pinned model `jev-1.13.0`), with determinism and batching checks and per-request token tracking; R, I, V, indecision. 15 of 18 acceptance items fully automated | Human validation of Q3 checks (100 LLM checks; 50 per template); running the real Jev client (response field names and auth header from TypeSafe's API reference); full-size pool build (needs the `model.base` tokenizer) |
-| [Spec 2 — Surprisal](<../specs/Spec 2 — Base-Model Surprisal.md>) | Construct S; base-model accuracy | Prerequisites only: `build_messages` with the `direct` and `reason` formats, `extract_answer`, `answers_match`, and the HF and vLLM backends with token log-probabilities | `answer_nll`, sampling, S percentile (M4) |
+| [Spec 1 — Pool and Jev scoring](<../specs/Spec 1 — Pool Construction and Jev Scoring.md>) | Constructs R and I; verified correctness for E0 and E3 | All five stages' logic: loaders for FinQA, TAT-QA and FinanceBench; exclusions; exact and MinHash deduplication; stratified probe, fixed-demo and test splits; FinQA executor (port of the official one); TAT-QA evaluator; Q3 templates plus LLM fallback; 1,000 `#neg` validation negatives; six-question Jev battery sent as one batched request per item (pinned model `jev-1.13.0`), with determinism and batching checks and per-request token tracking; R, I, V, indecision. 15 of 18 acceptance items fully automated | Human validation of Q3 checks (100 LLM checks; 50 per template); running the real Jev client (response field names and auth header from TypeSafe's API reference); full-size pool build (now possible with the OLMo 3 tokenizer) |
+| [Spec 2 — Surprisal](<../specs/Spec 2 — Base-Model Surprisal.md>) | Construct S; base-model accuracy | Prerequisites: `build_messages` with the `direct` and `reason` formats, `extract_answer`, `answers_match`, the HF and vLLM backends with token log-probabilities, and `model.base` pinned to OLMo 3 7B Instruct with its chat template checked (S2-09) | `answer_nll`, sampling, S percentile (M4) |
 | [Spec 3 — Validity and gates](<../specs/Spec 3 — Validity Checks and Gates (E0).md>) | E0; H1; gates D1–D4 | Infrastructure: `results/gates.json` schema with locked, validated writes; start-up halt check on gated stages; the verdict recorder for `hypotheses.csv`; CSV annotation module reused by the 150-item audit | Comparators, analyses A1–A6, gate logic, analysis frame (M5) |
 | [Spec 4 — Proxies G and C](<../specs/Spec 4 — Value Proxies G and C.md>) | Value proxies G and C | Prompt assembler and backends that C will use; LoRA and projection settings entered in config (seeds are placeholders) | `compute_influence`, `run_condition` (M6) |
 | [Spec 5 — Main tests](<../specs/Spec 5 — Main Hypothesis Tests (E1, E2).md>) | E1, E2; H2, H3, H4, H6; gates D5, D6 | Verdict recorder; gated stages `e1`/`e2` registered with the halt check | Conditions, regressions, fixed-effects logit, bootstrap, figures (M7) |
 | [Spec 6 — E3](<../specs/Spec 6 — Reliability Gate and Causal Manipulation (E3).md>) | E3; H5 | `make_wrong_answer` and `generate_check(answer=…)` shared with Spec 1, as Spec 6 requires; `e3` stage registered with both halt checks (D5 override honoured) | Variants, manipulation check, paired tests (M8) |
 
-Every acceptance item in the six specs has an ID and a status in [`code/tests/ACCEPTANCE.md`](../code/tests/ACCEPTANCE.md): 16 implemented, 7 partial, 52 pending (75 in total).
+Every acceptance item in the six specs has an ID and a status in [`code/tests/ACCEPTANCE.md`](../code/tests/ACCEPTANCE.md): 17 implemented, 7 partial, 51 pending (75 in total).
 
 ## Experiments E0–E3
 
@@ -75,7 +113,7 @@ No hypothesis has a verdict yet. `results/hypotheses.csv` does not exist, and ve
 **Early signals worth watching.** These are not gate results.
 - **D1:** execution verifies every FinQA train item and 99.3% of TAT-QA arithmetic items. Any arithmetic reliability signal will therefore come from the constructed negatives, as Spec 1 anticipates.
 - **D4:** FinQA has few lookup items (185 of 6,251 train programs end in a table operation). Small per-dataset cells are possible.
-- **Out-of-distribution test:** only 52 of 150 FinanceBench items have a single-number answer with evidence, before the token budget. Spec 4 needs ≥ 50 survivors to hypothesis-test out-of-distribution results.
+- **Out-of-distribution test:** only 52 of 150 FinanceBench items have a single-number answer with evidence. All 52 fit the token budget with the OLMo 3 tokenizer, so Spec 4's threshold of 50 is met, provided deduplication removes at most two.
 
 ## Verification on real data
 
@@ -92,6 +130,7 @@ No hypothesis has a verdict yet. `results/hypotheses.csv` does not exist, and ve
 None of these alters a pre-registered threshold or hypothesis rule. All are owner decisions recorded in the Implementation Plan's decisions log.
 
 - **Human labeling:** CSV files sent to annotators and returned with labels, never Argilla. Spec 1 and the protocol text were updated to say so.
+- **Base model:** OLMo 3 7B Instruct, chosen for its auditable training data (see Base model above). The protocol leaves the checkpoint open; this fills it.
 - **Jev cost:** each item is scored in one batched request carrying all six questions, so the state is billed once instead of six times. A 200-item check against single-question requests guards against any coupling, and `jev.model` is pinned to `jev-1.13.0`. This is a Spec 1 change; the battery wording and aggregation are unchanged.
 - **Statistics:** Python only. The protocol's lme4 mixed models become the Spec 5 fixed-effects logit with a cluster bootstrap.
 - **Values the specs left blank, now decided:**
@@ -110,7 +149,6 @@ None of these alters a pre-registered threshold or hypothesis rule. All are owne
 ## Blockers and next steps
 
 **Blockers:**
-- Choice of `model.base` (needed for a full-size pool build and for M4).
 - Choice of `model.strong`.
 - From TypeSafe's API reference: the response fields (noul probability, request ID, reported model) and the authentication header.
 - Approval of the Q3 fallback prompt.

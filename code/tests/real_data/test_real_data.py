@@ -99,3 +99,53 @@ def test_leakage_exact_check_on_real_run():
         overlap = Counter(k for s in sh for k in index.get(s, ()))
         for k, inter in overlap.items():
             assert inter / (len(sh) + held_sizes[k] - inter) < thr, (row["item_id"], held.iloc[k]["item_id"])
+
+
+@pytest.fixture(scope="module")
+def base_tokenizer():
+    """The model.base tokenizer at its pinned revision (downloads tokenizer files only, no weights)."""
+    from omegaconf import OmegaConf
+    from transformers import AutoTokenizer
+
+    from fqsel.config import CONF_DIR
+
+    base = OmegaConf.load(CONF_DIR / "model" / "base.yaml")
+    return AutoTokenizer.from_pretrained(base.name, revision=base.revision)
+
+
+@pytest.mark.spec("S2-09")
+def test_base_chat_template_has_no_reasoning_block(base_tokenizer):
+    """Spec 2: the chat template renders no thinking/reasoning block, in either prompt format."""
+    from fqsel.prompts import build_messages
+    from tests.fixtures.golden_items import golden_items
+
+    item = golden_items()["tatqa:q-arith"]
+    for fmt, kw in (("direct", {"with_answer": True}), ("reason", {})):
+        text = base_tokenizer.apply_chat_template(build_messages(item, fmt, **kw), tokenize=False,
+                                                  add_generation_prompt=not kw)
+        lowered = text.lower()
+        assert "<think" not in lowered and "reasoning" not in lowered.split("<|im_start|>user")[0]
+        assert "<|im_start|>user\n" in text
+    direct = base_tokenizer.apply_chat_template(build_messages(item, "direct", with_answer=True), tokenize=False)
+    assert direct.endswith("<|im_start|>assistant\nAnswer: 12.76 percent" + base_tokenizer.eos_token)
+
+
+def test_token_budget_with_base_tokenizer(base_tokenizer):
+    """Real exclusion rates under the Spec 1 budget; recorded in the Verification log."""
+    from fqsel.prompts import render_item
+
+    items = load_finqa(REAL_RAW, {s: f"finqa/{s}.json" for s in ("train", "dev", "test")})
+    items += load_tatqa(REAL_RAW, {"train": "tatqa/tatqa_dataset_train.json", "dev": "tatqa/tatqa_dataset_dev.json",
+                                   "test": "tatqa/tatqa_dataset_test_gold.json"})
+    fb, _ = load_financebench(REAL_RAW, {"test": "financebench/financebench_open_source.jsonl"})
+    total, over = Counter(), Counter()
+    for it in items + fb:
+        n = len(base_tokenizer(render_item(it, "qa"), add_special_tokens=False)["input_ids"])
+        key = (it["dataset"], it["source_split"])
+        total[key] += 1
+        over[key] += n > (4096 if it["source_split"] == "test" else 2048)
+    rates = {f"{d}/{s}": over[(d, s)] / total[(d, s)] for d, s in sorted(total)}
+    print(f"over-budget rates with model.base tokenizer: {rates}")
+    assert all(r < 0.05 for r in rates.values())
+    fb_kept = total[("financebench", "test")] - over[("financebench", "test")]
+    assert fb_kept >= 50, "Spec 4 needs >= 50 FinanceBench items to hypothesis-test out-of-distribution results"

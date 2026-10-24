@@ -430,7 +430,7 @@ The `e3` stage exists as a placeholder from M0 and is filled in here.
 ## Blocking questions (need owner decision before dependent code)
 
 **External facts still needed** (asked at the milestone shown)
-1. Model choices: `model.base` (7–8B instruct, ≥ 16k context, reasoning switchable off, revision hash), `model.strong`, and the ~0.5B tiny-profile model. *(base tokenizer: needed for a full-size real-data pool build; tiny model and base: M4; strong: before any real Q3 fallback run)*
+1. Model choices: ~~`model.base`~~ resolved 2026-10-23: OLMo 3 7B Instruct at revision `6e5971d9eba42665f5bd5a0fcf047f299ce1dccc`. Still open: `model.strong` (before any real Q3 fallback run) and the ~0.5B tiny-profile model (M4).
 2. From TypeSafe's API reference: the response fields for a noul answer's probability, the request ID and the reported model ID, the authentication header (`jev.api.*` placeholders), and whether the ~260-token per-request overhead is billed as measured. The request format and the pinned model (`jev-1.13.0`) are now fixed in Spec 1. *(real `jev` run)*
 3. ~~Raw data field names; TAT-QA test gold availability~~ — resolved 2026-10-23: confirmed against the downloaded files; TAT-QA test gold is public.
 
@@ -490,6 +490,8 @@ Real-data, GPU, API and human checks, recorded as they are run. One row per chec
 | 2026-10-23 | no-commit | Full test suite | tiny | 325 passed (6 real_data/gpu deselected); ruff clean | yes | `pytest -q` |
 | 2026-10-23 | 53ef30d+ | Batched Jev stage on the tiny real-data build | tiny | 140 items → 140 six-question requests; batching check: batched = single (mode batched); `check: OK` | yes | MockJev; token counts are mock estimates |
 | 2026-10-23 | 53ef30d+ | Full test suite after the batching change | tiny | 332 passed; ruff clean; e2e and Jev tests stable over 8 repeats | yes | |
+| 2026-10-23 | e2a3ce8+ | OLMo 3 7B Instruct chat template (S2-09) | — | no reasoning block in direct or reason format; default system prompt present | yes | `real_data`, tokenizer files only |
+| 2026-10-23 | e2a3ce8+ | Token budget with the model.base tokenizer | — | over budget: FinQA train 0.78% (49), TAT-QA train 0.36% (48), TAT-QA dev 0.72% (12), all other splits 0%; FinanceBench 52/52 fit | yes | max qa_tokens 3,925 (TAT-QA train) |
 
 ## Owner decisions log
 
@@ -512,3 +514,4 @@ Real-data, GPU, API and human checks, recorded as they are run. One row per chec
 | 2026-10-23 | Table-op Q3 templates | Templates win for any program ending in a templated op, including FinQA table-op (lookup) items |
 | 2026-10-23 | Jev cost reduction (Spec 1 edit) | One batched request per item with all six questions; `jev.model` pinned to `jev-1.13.0`; batching verified against single-question requests on 200 items |
 | 2026-10-23 | Jev model version | `jev-1.13.0` confirmed for the whole study (no later version); fixed before any real scoring |
+| 2026-10-23 | `model.base` | OLMo 3 7B Instruct (`allenai/Olmo-3-7B-Instruct`, revision `6e5971d9eba42665f5bd5a0fcf047f299ce1dccc`): fully open training data allow a contamination audit; chat template used unchanged (it inserts a default system prompt); Llama 3.1 8B Instruct suggested as an exploratory H4 robustness check |

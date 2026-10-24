@@ -1,5 +1,8 @@
 # model.base — the frozen 7–8B open instruct checkpoint used by Specs 2–6 unchanged.
-name: ???            # OWNER DECISION PENDING — Blocking questions: external facts #1
-revision: ???        # OWNER DECISION PENDING — exact Hugging Face revision hash
+# Owner decision 2026-10-23: OLMo 3 7B Instruct (Ai2, Apache-2.0), chosen because its full pre- and
+# post-training data are public, so FinQA/TAT-QA/FinanceBench contamination can be checked directly.
+# Revision pinned to a commit hash, never a branch, so every stage uses the identical checkpoint.
+name: allenai/Olmo-3-7B-Instruct
+revision: 6e5971d9eba42665f5bd5a0fcf047f299ce1dccc   # main as of 2026-06-25 (last modified)
 dtype: bfloat16
-min_context: 16384
+min_context: 16384   # protocol minimum; the checkpoint supports 65,536 (YaRN from 8,192)
