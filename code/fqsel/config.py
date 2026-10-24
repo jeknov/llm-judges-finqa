@@ -21,12 +21,15 @@ class PlaceholderError(RuntimeError):
     """A value or prompt the owner has not decided yet was needed by a pilot or full run."""
 
 
-def load_config(overrides: Iterable[str] = ()) -> DictConfig:
+def load_config(overrides: Iterable[str] = (), ignore: Iterable[str] = ()) -> DictConfig:
+    """`ignore` lists config prefixes and prompt files the caller never reads (Stage.ignores); they may
+    stay undecided. Reading one anyway still fails: OmegaConf raises on `???` and load_prompt refuses
+    non-FINAL prompts outside tiny."""
     with initialize_config_dir(config_dir=str(CONF_DIR), version_base="1.3"):
         cfg = compose(config_name="config", overrides=list(overrides))
     OmegaConf.set_struct(cfg, True)
     if cfg.profile != "tiny":
-        check_real_run_ready(cfg)
+        check_real_run_ready(cfg, ignore)
     return cfg
 
 
@@ -83,9 +86,14 @@ def unfinished_prompts() -> list[str]:
     )
 
 
-def check_real_run_ready(cfg: DictConfig) -> None:
-    problems = [f"config value {k} is ???" for k in find_missing(cfg)]
-    problems += [f"prompts/{p} is not FINAL" for p in unfinished_prompts()]
+def _ignored(key: str, ignore: tuple[str, ...]) -> bool:
+    return any(key == i or key.startswith(f"{i}.") for i in ignore)
+
+
+def check_real_run_ready(cfg: DictConfig, ignore: Iterable[str] = ()) -> None:
+    ignore = tuple(ignore)
+    problems = [f"config value {k} is ???" for k in find_missing(cfg) if not _ignored(k, ignore)]
+    problems += [f"prompts/{p} is not FINAL" for p in unfinished_prompts() if p not in ignore]
     if problems:
         raise PlaceholderError(
             f"profile={cfg.profile} cannot run with owner decisions pending:\n  - "

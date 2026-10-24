@@ -93,9 +93,7 @@ def test_config_is_strict(cfg):
 
 def test_tiny_profile_has_no_missing_values_it_uses(cfg):
     """Tiny runs with mocks; only values not needed by tiny (real models, later milestones) may be ???."""
-    allowed = {"jev.api.auth_header", "jev.api.answers_field", "jev.api.probability_field",
-               "jev.api.request_id_field", "jev.api.model_field", "proxy.lora.seed", "proxy.projection.seed",
-               "stats.top_rounding", "stats.top_tie_break"}
+    allowed = {"proxy.lora.seed", "proxy.projection.seed", "stats.top_rounding", "stats.top_tie_break"}
     assert set(find_missing(cfg)) <= allowed
 
 
@@ -108,6 +106,41 @@ def test_no_placeholders_for_real_runs(profile):
     message = str(err.value)
     assert "proxy.lora.seed" in message and "prompts/judge_quality.txt" in message
     assert "model.base" not in message  # decided 2026-10-23: OLMo 3 7B Instruct
+
+
+def test_spec1_stages_ignore_only_later_decisions():
+    """Spec 1 stages may run before P1/P3/P8 are decided, but never skip their own sections."""
+    from fqsel.stages import get_stage
+
+    for name in ("pool", "verify", "q3", "jev"):
+        ignores = set(get_stage(name).ignores)
+        assert {"proxy", "stats", "judge_quality.txt"} <= ignores
+        assert not ignores & {"data", "model", "q3_fallback.txt", "jev_battery.yaml"}
+    assert "jev" not in get_stage("jev").ignores
+    assert all(not s.ignores for s in STAGES if s.spec > 1)
+
+
+def test_jev_stage_loads_for_real_runs_but_refuses_its_own_placeholders():
+    from fqsel.stages import get_stage
+
+    load_config(["profile=pilot"], ignore=get_stage("jev").ignores)  # every Spec 1 value is decided
+    with pytest.raises(PlaceholderError) as err:
+        load_config(["profile=pilot", "jev.api.answers_field=???"], ignore=get_stage("jev").ignores)
+    message = str(err.value)
+    assert "jev.api.answers_field" in message
+    assert "proxy.lora.seed" not in message and "judge_quality.txt" not in message
+
+
+def test_ignored_value_still_fails_when_read():
+    """Ignoring a section only skips the start-up check; reading a ??? there still raises."""
+    from omegaconf.errors import MissingMandatoryValue
+
+    from fqsel.config import check_real_run_ready
+
+    cfg = load_config()
+    check_real_run_ready(cfg, ignore=find_missing(cfg) + unfinished_prompts())
+    with pytest.raises(MissingMandatoryValue):
+        _ = cfg.proxy.lora.seed
 
 
 def test_model_base_is_pinned_to_a_commit():
@@ -151,3 +184,15 @@ def test_spec6_gate_needs_override(cfg):
 
 def test_gates_schema_file_is_valid_json():
     json.loads((CODE_DIR / "conf" / "gates.schema.json").read_text())
+
+
+def test_annotate_uses_q3_placeholder_scope(monkeypatch):
+    """`annotate` reads Q3 data only, so it may run once Spec 1's own values are decided."""
+    from fqsel import cli
+    from fqsel.stages import get_stage
+
+    seen = {}
+    monkeypatch.setattr(cli, "load_config", lambda overrides, ignore=(): seen.setdefault("ignore", ignore) and None)
+    monkeypatch.setattr("fqsel.q3_validation.export_task", lambda task, cfg: [])
+    cli.main(["annotate", "export", "q3_validation"])
+    assert tuple(seen["ignore"]) == get_stage("q3").ignores

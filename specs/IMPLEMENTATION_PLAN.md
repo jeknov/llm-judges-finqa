@@ -158,7 +158,7 @@ jev-workshop-paper/
 
 **clients**
 - [x] `MockJev` and the real client on a fake HTTP endpoint pass the same interface test (S1-16)
-- [ ] The real Jev client passes the same interface test (blocked: TypeSafe docs)
+- [x] The real Jev client passes the same interface test, with the fake endpoint serving the documented response shape and a recorded live response (2026-10-24)
 - [x] (added) Cache: second identical call makes no network request (counted via a fake transport); changing model version changes the key
 
 **backends**
@@ -231,10 +231,10 @@ jev-workshop-paper/
 
 ## M3 — Jev scoring: `jev`
 **Status (2026-10-23): done against `MockJev`; reworked the same day for batched requests** (Spec 1 change to cut TypeSafe cost: one request per item carrying all six questions). The real client is written to the Spec 1 request format and tested against a fake HTTP endpoint; it refuses to run until the response field names and the authentication header are taken from TypeSafe's API reference (external facts #2).
-- [x] `jev_ask(state, questions)`: one `POST /v1/systemone` per item, state = `judge` rendering, six noul questions `q1 q2 q3 q1p q2p q3p`, `jev.model` pinned to `jev-1.13.0`
+- [x] `jev_ask(state, questions)`: one `POST /v1/systemone` per item, state = `judge` rendering, six noul questions `q1 q2 q3 q1p q2p q3p`, `jev.model` pinned to `jev-1.14.0`
 - [x] Cache keyed on SHA-256 of (model ID, state, canonical JSON of questions); `429` retried with backoff honouring `retry-after`; request IDs and `usage.input_tokens` logged
 - [x] Tiny profile against `MockJev`
-- [ ] Real Jev client run (blocked: response field names and auth header from TypeSafe's API reference)
+- [ ] Real Jev client run: API fields resolved 2026-10-24; the client rejects responses from any version other than `jev.model` and responses without a request-ID header. Waiting on the owner's go-ahead for the pilot's ~1,900 requests
 - [x] Determinism check (200 items scored twice, batched) and batching check (same items, one question per request); mode recorded in `results/jev_manifest.json`
 - [x] Outputs: `jev_scores_long` (+ `batched`, `request_id`), `jev_requests` (one row per request, input tokens), `jev_scores`
 - [x] Aggregate R, I, V, indecision (+ para)
@@ -431,7 +431,7 @@ The `e3` stage exists as a placeholder from M0 and is filled in here.
 
 **External facts still needed** (asked at the milestone shown)
 1. Model choices: ~~`model.base`~~ resolved 2026-10-23: OLMo 3 7B Instruct at revision `6e5971d9eba42665f5bd5a0fcf047f299ce1dccc`. `model.strong` resolved 2026-10-24: Qwen3-235B-A22B-Instruct-2507 via OpenRouter, pinned to `deepinfra/fp8`. Still open: the ~0.5B tiny-profile model (M4).
-2. From TypeSafe's API reference: the response fields for a noul answer's probability, the request ID and the reported model ID, the authentication header (`jev.api.*` placeholders), and whether the ~260-token per-request overhead is billed as measured. The request format and the pinned model (`jev-1.13.0`) are now fixed in Spec 1. *(real `jev` run)*
+2. ~~From TypeSafe's API reference: the response fields and the authentication header (`jev.api.*`).~~ *Resolved 2026-10-24* from https://docs.typesafe.ai/api/system-one and live responses: `Authorization: Bearer <key>`; answers in `answers.<qid>.noul` (P(yes), rounded to 0.01); reported model in `model`; request ID in the `x-typesafe-request-id` response header. `GET /v1/models` lists only the aliases `jev-latest` and `jev-preview`, both resolving to `jev-1.14.0`; the versioned ID `jev-1.14.0` is served and reported back when requested, and the study pins it. Still open: whether the ~260-token per-request overhead is billed as measured, and how long the versioned ID `jev-1.14.0` stays available. *(real `jev` run)*
 3. ~~Raw data field names; TAT-QA test gold availability~~ — resolved 2026-10-23: confirmed against the downloaded files; TAT-QA test gold is public.
 
 **Placeholders: values the specs leave blank** (kept as `???` until the owner decides)
@@ -492,6 +492,11 @@ Real-data, GPU, API and human checks, recorded as they are run. One row per chec
 | 2026-10-23 | 53ef30d+ | Full test suite after the batching change | tiny | 332 passed; ruff clean; e2e and Jev tests stable over 8 repeats | yes | |
 | 2026-10-23 | e2a3ce8+ | OLMo 3 7B Instruct chat template (S2-09) | — | no reasoning block in direct or reason format; default system prompt present | yes | `real_data`, tokenizer files only |
 | 2026-10-23 | e2a3ce8+ | Token budget with the model.base tokenizer | — | over budget: FinQA train 0.78% (49), TAT-QA train 0.36% (48), TAT-QA dev 0.72% (12), all other splits 0%; FinanceBench 52/52 fit | yes | max qa_tokens 3,925 (TAT-QA train) |
+| 2026-10-24 | b8e73a0+ | Pilot pool and verify on real data (after two fixes: pilot negatives 1,000 → 100; multi-span negatives with a placeholder first span) | pilot | pool 1,860 rows (200 pool, 100 negatives), 245 exclusions; verify 1,722/1,860 | yes | negatives fail verification by construction |
+| 2026-10-24 | b8e73a0+ | Pilot q3 with real Qwen3-235B via OpenRouter | pilot | 299 checks (213 template, 86 LLM), 1 negative dropped after two failed fallbacks; 89 calls, all served by DeepInfra, $0.009 | yes | annotation CSVs exported for q3_validation (86 rows) and q3_templates (120 rows) |
+| 2026-10-24 | b8e73a0+ | Live TypeSafe probes (GET /v1/models; 3 tiny POST /v1/systemone) | — | response shape matches the API reference; `jev-1.13.0` served and reported; `jev-latest` → `jev-1.14.0`; unknown ID → 400; noul rounded to 0.01 | yes | basis for the `jev.api.*` values |
+| 2026-10-24 | b8e73a0+ | Pilot jev dry run with MockJev (request count) | pilot | preflight 1,600 requests (~1.81M input tokens); scoring 299 requests (~0.37M) if batched and deterministic | — | MockJev token counts are estimates (chars/4 + 260) |
+| 2026-10-24 | b8e73a0+ | Full test suite | tiny | 351 passed; ruff clean | yes | |
 
 ## Owner decisions log
 
@@ -520,3 +525,7 @@ Real-data, GPU, API and human checks, recorded as they are run. One row per chec
 | 2026-10-24 | `model.base` licence | OLMo 3 7B Instruct is Apache 2.0, as declared on its model card (https://huggingface.co/allenai/Olmo-3-7B-Instruct) at the pinned revision `6e5971d9`; no separate LICENSE file in the repository |
 | 2026-10-24 | P5 self-consistency sampling | Temperature 0.7 (matches Spec 2 accuracy and Spec 4 CBI sampling; Qwen's recommended value), top-p 0.8, top-k 20, min-p 0 (Qwen's recommended settings), max 512 tokens (Spec 2 reason format), 5 separate requests with seeds `stable_seed(global_seed, item_id, "sc", k)` |
 | 2026-10-24 | P4 Q3 fallback prompt approved | Owner set `prompts/q3_fallback.txt` to `STATUS: FINAL`; wording frozen (a change requires regenerating all LLM checks) |
+| 2026-10-24 | Jev API fields (`jev.api.*`) | From https://docs.typesafe.ai/api/system-one and live responses: `Authorization: Bearer <key>`; answers in `answers.<qid>.noul` (P(yes), rounded to 0.01); reported model in `model`; request ID in the `x-typesafe-request-id` response header. `GET /v1/models` lists only the aliases `jev-latest` and `jev-preview`, both resolving to `jev-1.14.0`; the versioned ID `jev-1.14.0` is served and reported back when requested, and the study pins it. The real client now rejects any response whose `model` is not `jev.model`. |
+| 2026-10-24 | Placeholder check per stage | Spec 1 stages and `annotate` ignore P1, P3 and P8 (`Stage.ignores`); reading an ignored `???` still raises, and `load_prompt` still refuses non-FINAL prompts |
+| 2026-10-24 | Pilot negatives | 100 (pilot only; the full run keeps Spec 1's 1,000): a 200-item pool cannot supply 1,000 negatives |
+| 2026-10-24 | Jev model version changed to `jev-1.14.0` | Owner decision: every experiment uses `jev-1.14.0`, and `jev-1.13.0` is not used anywhere. Supersedes the 2026-10-23 rows above. Both aliases (`jev-latest`, `jev-preview`) resolve to `jev-1.14.0`, but the config names the versioned ID and the client refuses aliases. No real Jev scoring had run under `jev-1.13.0` |

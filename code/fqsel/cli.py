@@ -7,7 +7,7 @@ import sys
 
 from fqsel.config import load_config
 from fqsel.gates import HaltError
-from fqsel.stages import STAGE_NAMES, run_stage
+from fqsel.stages import STAGE_NAMES, get_stage, run_stage
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -24,7 +24,9 @@ def main(argv: list[str] | None = None) -> int:
     p_ann.add_argument("overrides", nargs="*")
     args = parser.parse_args(argv)
 
-    cfg = load_config(args.overrides)
+    # a command skips only the placeholders of the stage whose data it reads; annotation tasks are all Q3's
+    stage = args.stage if args.command == "run" else "q3" if args.command == "annotate" else None
+    cfg = load_config(args.overrides, ignore=get_stage(stage).ignores if stage else ())
     if args.command == "run":
         try:
             return run_stage(args.stage, cfg)

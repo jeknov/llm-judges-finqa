@@ -74,7 +74,13 @@ def _numeric(item: Mapping, tag: str, attempt: int, factors: Sequence[float], se
         new_display, strategy, scale = gold.value * factor, f"factor:{factor:g}", factor
     new_text = format_like(gold_text, new_display)
     if isinstance(gold_value, list):
-        new_value = [format_like(gold_value[0], new_display)] if gold_value else [new_text]
+        # the first number in gold_text sits in the first span that has one; spans like "-" are kept
+        k = next((i for i, v in enumerate(gold_value) if _NUM.search(str(v))), None)
+        if k is None:
+            new_value = [new_text]
+        else:
+            new_value = list(gold_value)
+            new_value[k] = format_like(str(gold_value[k]), new_display)
     elif isinstance(gold_value, (int, float)):
         new_value = float(gold_value) * scale
     else:

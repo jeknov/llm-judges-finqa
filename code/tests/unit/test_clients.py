@@ -20,8 +20,18 @@ QUESTIONS = {"q1": "Is it supported?", "q2": "Is it determined?", "q3": "Does it
              "q1p": "Backed up?", "q2p": "Only answer?", "q3p": "Must X hold?"}
 
 # Test-only stand-ins for the response mapping that must come from TypeSafe's API reference.
-FAKE_API = ["jev.api.auth_header=X-Test-Key", "jev.api.answers_field=answers",
-            "jev.api.probability_field=p", "jev.api.request_id_field=id", "jev.api.model_field=model"]
+# A live response from POST /v1/systemone (2026-10-24), with its request-ID header.
+LIVE_RESPONSE = {"model": "jev-1.14.0",
+                 "answers": {"q1": {"type": "noul", "noul": 0.99}, "q2": {"type": "noul", "noul": 0.01}},
+                 "usage": {"input_tokens": 326, "output_tokens": 38}}
+LIVE_REQUEST_ID = "req_01a16f2d056d7caa8399f76507b79875"
+LIVE_QUESTIONS = {"q1": "Did revenue increase from 2018 to 2019?", "q2": "Was revenue in 2019 below 50?"}
+
+
+class _Response(io.BytesIO):
+    def __init__(self, payload: dict, headers: dict):
+        super().__init__(json.dumps(payload).encode())
+        self.headers = headers
 
 
 class FakeHTTP:
@@ -38,10 +48,10 @@ class FakeHTTP:
             raise urllib.error.HTTPError(req.full_url, 429, "Too Many Requests",
                                          {"retry-after": self.retry_after}, io.BytesIO(b""))
         qs = self.bodies[-1]["questions"]
-        payload = {"id": f"req-{len(self.bodies)}", "model": "jev-1.13.0",
-                   "answers": {q: {"p": 0.25 + 0.05 * i} for i, q in enumerate(sorted(qs))},
-                   "usage": {"input_tokens": 512}}
-        return io.BytesIO(json.dumps(payload).encode())
+        payload = {"model": "jev-1.14.0",
+                   "answers": {q: {"type": "noul", "noul": 0.25 + 0.05 * i} for i, q in enumerate(sorted(qs))},
+                   "usage": {"input_tokens": 512, "output_tokens": 40}}
+        return _Response(payload, {"x-typesafe-request-id": f"req-{len(self.bodies)}"})
 
 
 @pytest.fixture
@@ -49,7 +59,7 @@ def real_backend(make_cfg, monkeypatch):
     monkeypatch.setenv("TYPESAFE_API_KEY", "secret")
     http = FakeHTTP(n_429=1)
     monkeypatch.setattr(urllib.request, "urlopen", http)
-    return RealJev(make_cfg(*FAKE_API)), http
+    return RealJev(make_cfg()), http
 
 
 def _client(backend, tmp_path, sleeps=None):
@@ -79,16 +89,32 @@ def test_real_client_sends_one_batched_request_in_spec_format(real_backend, tmp_
     backend, http = real_backend
     resp = _client(backend, tmp_path).ask("STATE", QUESTIONS)
     body = http.bodies[-1]
-    assert body == request_body("jev-1.13.0", "STATE", QUESTIONS, "noul")
+    assert body == request_body("jev-1.14.0", "STATE", QUESTIONS, "noul")
     assert body["questions"]["q3p"] == {"type": "noul", "instructions": "Must X hold?"}
-    assert http.headers[-1]["X-test-key"] == "secret"
-    assert resp.model_version == "jev-1.13.0" and resp.input_tokens == 512 and resp.request_id == "req-2"
+    assert http.headers[-1]["Authorization"] == "Bearer secret"
+    assert resp.model_version == "jev-1.14.0" and resp.input_tokens == 512 and resp.request_id == "req-2"
 
 
-def test_real_client_refuses_until_api_reference_fields_are_set(cfg, monkeypatch):
+def test_real_client_refuses_without_api_reference_fields(make_cfg, monkeypatch):
     monkeypatch.setenv("TYPESAFE_API_KEY", "secret")
     with pytest.raises(PlaceholderError):
-        RealJev(cfg)
+        RealJev(make_cfg("jev.api.probability_field=???"))
+
+
+def test_real_client_parses_a_live_response(make_cfg, monkeypatch):
+    monkeypatch.setenv("TYPESAFE_API_KEY", "secret")
+    monkeypatch.setattr(urllib.request, "urlopen", lambda req, timeout=None: _Response(
+        LIVE_RESPONSE, {"x-typesafe-request-id": LIVE_REQUEST_ID}))
+    resp = RealJev(make_cfg()).ask("Revenue was 120 in 2019 and 100 in 2018.", LIVE_QUESTIONS)
+    assert resp.probs == {"q1": 0.99, "q2": 0.01} and resp.model_version == "jev-1.14.0"
+    assert resp.request_id == LIVE_REQUEST_ID and resp.input_tokens == 326
+
+
+def test_real_client_requires_request_id_header(make_cfg, monkeypatch):
+    monkeypatch.setenv("TYPESAFE_API_KEY", "secret")
+    monkeypatch.setattr(urllib.request, "urlopen", lambda req, timeout=None: _Response(LIVE_RESPONSE, {}))
+    with pytest.raises(ValueError, match="x-typesafe-request-id"):
+        RealJev(make_cfg()).ask("STATE", {"q1": "Did revenue increase?"})
 
 
 def test_mock_answers_do_not_depend_on_batching():
@@ -109,7 +135,7 @@ def test_cache_hit_sends_no_request_and_key_covers_model_state_questions(tmp_pat
     client.ask("S2", QUESTIONS)
     client.ask("S", {**QUESTIONS, "q1": "changed"})
     assert len(backend.requests) == 4
-    other = MockJev(model="jev-1.14.0")
+    other = MockJev(model="jev-1.15.0")
     _client(other, tmp_path).ask("S", QUESTIONS)
     assert len(other.requests) == 1
 
@@ -303,3 +329,21 @@ def test_strong_client_caches_text_samples_per_seed(tmp_path, cfg):
     assert client.generate_text("Q", s, 1) == a and len(mock.calls) == 1
     client.generate_text("Q", s, 2)
     assert len(mock.calls) == 2
+
+
+def test_real_client_rejects_a_different_model_version(make_cfg, monkeypatch):
+    """A response from any version other than the pinned one (here a hypothetical later release) is an error."""
+    monkeypatch.setenv("TYPESAFE_API_KEY", "secret")
+    other = {**LIVE_RESPONSE, "model": "jev-1.15.0"}
+    monkeypatch.setattr(urllib.request, "urlopen", lambda req, timeout=None: _Response(
+        other, {"x-typesafe-request-id": LIVE_REQUEST_ID}))
+    with pytest.raises(ValueError, match="pinned"):
+        RealJev(make_cfg()).ask("STATE", {"q1": "Did revenue increase?"})
+
+
+@pytest.mark.parametrize("alias", ["jev-latest", "jev-preview", "jev-1.14"])
+def test_real_client_refuses_aliases(make_cfg, monkeypatch, alias):
+    """Aliases move to new releases (both resolved to jev-1.14.0 on 2026-10-24); only a versioned ID may be set."""
+    monkeypatch.setenv("TYPESAFE_API_KEY", "secret")
+    with pytest.raises(ValueError, match="versioned ID"):
+        RealJev(make_cfg(f"jev.model={alias}"))

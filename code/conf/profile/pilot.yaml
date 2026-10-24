@@ -12,3 +12,5 @@ clients:
 data:
   sizes:
     pool_per_dataset: 100         # 200 pool items in total, the pilot size named in Spec 4
+  negatives:
+    n: 100                        # PILOT-ONLY (spec: 1,000 for the full pool); at most one negative per pool item

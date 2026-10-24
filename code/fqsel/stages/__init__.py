@@ -22,13 +22,18 @@ class Stage:
     module: str | None = None   # fqsel.stages.<module> with run(cfg); None = placeholder
     gated: bool = False
     spec6_gate: bool = False
+    ignores: tuple[str, ...] = ()  # config prefixes / prompt files this stage never reads (may stay ???)
+
+
+# Spec 1 stages run before the proxies (P1), the statistics (P8) and the judge (P3) are needed.
+_EARLY = ("proxy", "stats", "judge_quality.txt")
 
 
 STAGES: list[Stage] = [
-    Stage("pool", 1, "M2", "pool"),
-    Stage("verify", 1, "M2", "verify"),
-    Stage("q3", 1, "M2", "q3"),
-    Stage("jev", 1, "M3", "jev"),
+    Stage("pool", 1, "M2", "pool", ignores=(*_EARLY, "jev")),
+    Stage("verify", 1, "M2", "verify", ignores=(*_EARLY, "jev")),
+    Stage("q3", 1, "M2", "q3", ignores=(*_EARLY, "jev")),
+    Stage("jev", 1, "M3", "jev", ignores=_EARLY),
     Stage("surprisal", 2, "M4"),
     Stage("comparators", 3, "M5"),
     Stage("e0", 3, "M5"),

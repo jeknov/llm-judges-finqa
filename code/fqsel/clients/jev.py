@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import threading
 import urllib.error
 import urllib.request
@@ -93,14 +94,18 @@ class MockJev:
 
 class RealJev:
     """TypeSafe Jev API client (POST /v1/systemone). The response fields and the authentication header
-    come from TypeSafe's API reference and are config placeholders until then (Spec 1, Open items)."""
+    are set in conf/jev from TypeSafe's API reference (Spec 1, Client interface)."""
 
     def __init__(self, cfg: DictConfig):
         api = cfg.jev.api
-        missing = [k for k in ("auth_header", "answers_field", "probability_field", "request_id_field", "model_field")
+        missing = [k for k in ("auth_header", "auth_scheme", "answers_field", "probability_field", "request_id_header",
+                             "model_field")
                    if OmegaConf.is_missing(api, k)]
         if missing:
             raise PlaceholderError(f"jev.api.{', jev.api.'.join(missing)} must be taken from TypeSafe's API reference")
+        if not re.fullmatch(r"jev-\d+\.\d+\.\d+", str(cfg.jev.model)):
+            # aliases (jev-latest, jev-preview) move between versions; Spec 1 pins a versioned ID
+            raise ValueError(f"jev.model must be a versioned ID such as jev-1.14.0, not {cfg.jev.model!r}")
         self.model = cfg.jev.model
         self.endpoint = cfg.jev.endpoint
         self.qtype = cfg.jev.question_type
@@ -112,10 +117,11 @@ class RealJev:
     def ask(self, state: str, questions: dict[str, str]) -> JevResponse:
         body = json.dumps(request_body(self.model, state, questions, self.qtype)).encode()
         req = urllib.request.Request(self.endpoint, data=body, method="POST", headers={
-            "Content-Type": "application/json", self.api.auth_header: self.key})
+            "Content-Type": "application/json", self.api.auth_header: f"{self.api.auth_scheme} {self.key}"})
         try:
             with urllib.request.urlopen(req, timeout=self.api.timeout_s) as resp:
                 data = json.loads(resp.read())
+                request_id = resp.headers.get(self.api.request_id_header)
         except urllib.error.HTTPError as e:
             if e.code == 429:
                 ra = e.headers.get("retry-after")
@@ -127,7 +133,11 @@ class RealJev:
             raise TransientError(str(e)) from e
         answers = data[self.api.answers_field]
         probs = {qid: float(answers[qid][self.api.probability_field]) for qid in questions}
-        return JevResponse(probs, str(data[self.api.request_id_field]), str(data[self.api.model_field]),
+        if not request_id:
+            raise ValueError(f"Jev response has no {self.api.request_id_header} header")
+        if str(data[self.api.model_field]) != self.model:  # Spec 1: the pinned version, never another
+            raise ValueError(f"Jev answered with {data[self.api.model_field]!r}, not the pinned {self.model!r}")
+        return JevResponse(probs, str(request_id), str(data[self.api.model_field]),
                            int(data["usage"]["input_tokens"]), now_iso())
 
 

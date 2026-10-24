@@ -1,6 +1,6 @@
 # Implication-Weighted Data Selection (Protocol v1)
 
-Oct 23, 2026 · @Jekaterina
+Oct 23, 2026 · updated Oct 24, 2026 · @Jekaterina
 
 ## How to use this brief
 
@@ -18,6 +18,20 @@ This brief is the entry point for implementing the study in code. It summarizes 
 - Implement each shared helper exactly once (Shared conventions, below) and call it everywhere; duplicated prompt or scoring logic is the most likely source of silent errors.
 - Treat the items under "Open items" as blocking: confirm each against the real files or documentation before writing code that depends on it.
 - Build in the order under "Build order", and do not start a stage until the previous stage's acceptance tests pass on the tiny profile.
+
+## Current status (24 October 2026)
+
+Milestones 1–3 of the build order are done: the shared helpers, all of Spec 1 (pool, verification, Q3 checks, negatives, batched Jev scoring) and the CSV annotation workflow. 351 automated tests pass, plus checks on the downloaded data. Every spec acceptance item is tracked in `code/tests/ACCEPTANCE.md`.
+
+At pilot scale, pool, verification and Q3 checks have run on real data, with real Qwen calls for the fallback checks; the Q3 validation CSVs are out to annotators. The Jev client is configured from TypeSafe's API reference and checked against live responses; the pilot Jev run awaits the owner's go-ahead. **No scientific measurement exists yet:** no experiment, hypothesis verdict or gate outcome.
+
+All three models are chosen; see Models and external services.
+
+Details and progress records live elsewhere:
+- **Progress against the protocol:** experiments, hypotheses and gates in `docs/implementation-progress.md`.
+- **Task-level plan:** in `specs/IMPLEMENTATION_PLAN.md`, with the owner decisions log and the verification log.
+
+**Next:** milestone 4 (Spec 2, surprisal and base-model accuracy), then milestone 5, which produces the first scientific results: E0, the H1 verdict and gates D1–D4.
 
 ## Research goal
 
@@ -58,7 +72,7 @@ The study is one Python package, `fqsel`, run stage by stage with `python -m fqs
 | Stage | Spec | Reads | Writes |
 | --- | --- | --- | --- |
 | `pool`, `verify`, `q3` | 1 | raw files | `data/pool.parquet`, `data/verified.parquet`, `data/q3_checks.parquet` |
-| `jev` | 1 | pool, Q3 checks | `scores/jev_scores_long.parquet`, `scores/jev_scores.parquet` |
+| `jev` | 1 | pool, Q3 checks | `scores/jev_scores_long.parquet`, `scores/jev_requests.parquet`, `scores/jev_scores.parquet`, `results/jev_manifest.json` |
 | `surprisal` | 2 | pool | `scores/surprisal.parquet`, `runs/surprisal/samples.parquet` |
 | `comparators`, `e0` | 3 | Specs 1–2 outputs | `scores/comparators.parquet`, `results/e0/` |
 | `gates`, `frame` | 3 | e0 tables | `results/gates.json`, `data/analysis_frame.parquet`, H1 verdict |
@@ -74,14 +88,19 @@ Three models plus one non-model ground truth. Each external client sits behind a
 
 | Component | Config key | Used in | Role |
 | --- | --- | --- | --- |
-| Jev, decision-only judge (TypeSafe API) | `jev.*` | Specs 1, 6 | Six yes/no questions per item (Q1–Q3 and paraphrases) → R, I, indecision; manipulation check on variants |
-| Base model, open instruct 7–8B, not finance-tuned, ≥ 16,384-token context, frozen, bf16 on vLLM | `model.base` | Specs 2–6 | Answer NLL, sampled accuracy, loss-based comparators, gradients for G, generations for C |
-| Strong LLM, frontier API with structured output | `model.strong` | Specs 1, 3 | Fallback Q3 checks, judge-quality scores (0–5), self-consistency on a 3,000-item subsample |
-| Small open model, about 0.5B | `profile=tiny` | Tests | End-to-end smoke test only |
+| Jev, decision-only judge (TypeSafe API), pinned to `jev-1.14.0` | `jev.*` | Specs 1, 6 | Six yes/no (noul) questions per item (Q1–Q3 and paraphrases) in one batched request → R, I, indecision; manipulation check on variants |
+| Base model: **OLMo 3 7B Instruct** (`allenai/Olmo-3-7B-Instruct`, revision `6e5971d9eba42665f5bd5a0fcf047f299ce1dccc`, Apache 2.0), not finance-tuned, 65,536-token context, frozen, bf16 on vLLM | `model.base` | Specs 2–6 | Answer NLL, sampled accuracy, loss-based comparators, gradients for G, generations for C |
+| Strong LLM: **Qwen3-235B-A22B-Instruct-2507** via OpenRouter, pinned to the `deepinfra/fp8` endpoint, JSON-schema output, Apache 2.0 | `model.strong` | Specs 1, 3 | Fallback Q3 checks, judge-quality scores (0–5), self-consistency on a 3,000-item subsample |
+| Small open model, about 0.5B (until chosen: a locally built, test-only toy model) | `profile=tiny` | Tests | End-to-end smoke test only |
 | Gold programs and derivations | none | Specs 1, 3, 6 | Execution-based verification; ground truth for E0 and E3 |
 | Two human annotators, labeling CSV files returned with labels | none | Specs 1, 3 | Q3 check validation (100 items) and the 150-item audit |
 
-The base model is the only model whose identity affects results, and it must be the same checkpoint and revision hash in every stage. Fine-tuning appears nowhere except an optional four-run anchor outside these specs.
+The base model is the only model whose identity affects results, and it must be the same checkpoint and revision hash in every stage.
+
+**Why these models:**
+- **OLMo 3:** its training data are public, so FinQA/TAT-QA/FinanceBench contamination can be checked directly. The contamination audit is still to do.
+- **Qwen3-235B:** an open-weight model of a different family, so the H2 quality-judge baseline does not share the base model's biases. It also supports the temperatures and seeds the specs require; the Claude and OpenAI reasoning APIs no longer accept temperature.
+- **Departure from the protocol:** the strong model departs from the protocol's "frontier API" wording. Fine-tuning appears nowhere except an optional four-run anchor outside these specs.
 
 ## Shared conventions
 
@@ -102,6 +121,7 @@ These are defined in full in Spec 1, Shared conventions; every stage depends on 
 | `answer_nll(items, fmt, demos)` | `fqsel/nll.py` | Teacher-forced NLL over the answer-token span only |
 | `make_wrong_answer(item, tag)`, `generate_check(item, answer=None)` | `fqsel/perturb.py`, `fqsel/checks.py` | Shared by Spec 1 negatives and Spec 6 variants |
 | `stable_seed(*parts)` | `fqsel/ids.py` | SHA-256 based; the built-in `hash` is banned by a lint rule |
+| `jev_ask(state, questions)` | `fqsel/clients/jev.py` | One batched Jev request per item; cached, retries honouring `retry-after`, logs request IDs and input tokens |
 | `read_table`, `write_table` | `fqsel/io.py` | Pandera schema validation and metadata on every read and write; `read_table("items")` unions pool and E3 items |
 | `update_gates()`, `record_verdict(...)` | `fqsel/gates.py`, `fqsel/verdicts.py` | Locked, schema-validated writes to `gates.json` and `hypotheses.csv` |
 
@@ -119,7 +139,7 @@ Each subsection gives what a stage must produce and the parameters that are easi
 - **Verification.** Port the official FinQA executor; evaluate TAT-QA derivations with an AST whitelist, never `eval`. Unverified items are excluded; FinanceBench gets `verified = null`.
 - **Q3 checks.** One consequence statement per pool item, true whenever the answer is true: templates keyed on the program's final operation (subtract → direction, divide → ratio vs 1, add → total exceeds the largest addend, and so on), with a strong-LLM fallback under a JSON schema. Validated on 100 items, accepted at ≥ 90%.
 - **Negatives.** 1,000 `#neg` copies with wrong answers (×{0.5, 0.8, 1.25, 2}, sign flip, boolean flip, or span swap), with regenerated Q3 checks.
-- **Jev.** Six frozen yes/no (noul) questions per pool item and negative, sent in one batched request per item: `jev_ask(state, questions)` posts the `judge` rendering once as the state, with question IDs `q1`, `q2`, `q3`, `q1p`, `q2p`, `q3p`, to `/v1/systemone` with `jev.model` pinned to `jev-1.13.0`. Billing is per input token, so batching bills the state once instead of six times. R = P(yes | Q1); I = mean of P(yes | Q2) and P(yes | Q3); V = R × I; indecision = max binary entropy. Same for the paraphrase battery. Cache keyed on SHA-256 of (model ID, state, canonical JSON of questions); `429` retried honouring `retry-after`. A 200-item check confirms batched and single-question answers agree, otherwise every question is sent alone; `jev_requests.parquet` tracks input tokens per request.
+- **Jev.** Six frozen yes/no (noul) questions per pool item and negative, sent in one batched request per item: `jev_ask(state, questions)` posts the `judge` rendering once as the state, with question IDs `q1`, `q2`, `q3`, `q1p`, `q2p`, `q3p`, to `/v1/systemone` with `jev.model` pinned to `jev-1.14.0`. Billing is per input token, so batching bills the state once instead of six times. R = P(yes | Q1); I = mean of P(yes | Q2) and P(yes | Q3); V = R × I; indecision = max binary entropy. Same for the paraphrase battery. Cache keyed on SHA-256 of (model ID, state, canonical JSON of questions); `429` retried honouring `retry-after`. A 200-item check confirms batched and single-question answers agree, otherwise every question is sent alone; `jev_requests.parquet` tracks input tokens per request.
 
 ### Spec 2 — Base-model surprisal
 
@@ -128,7 +148,7 @@ Each subsection gives what a stage must produce and the parameters that are easi
 
 ### Spec 3 — Validity checks, gates and the analysis frame
 
-- **Comparators.** `pvi` (NLL without minus with context), `icl_reducible` (zero-shot minus 4-fixed-demo NLL), `ifd` (conditioned over answer-only NLL), `judge_quality` (0–5, also on negatives), and strong-LLM self-consistency on 3,000 items.
+- **Comparators.** `pvi` (NLL without minus with context), `icl_reducible` (zero-shot minus 4-fixed-demo NLL), `ifd` (conditioned over answer-only NLL), `judge_quality` (0–5, also on negatives), and strong-LLM self-consistency on 3,000 items (5 samples at temperature 0.7, top-p 0.8, top-k 20, 512 tokens; P5, owner decision).
 - **Analyses A1–A6.** A1: AUROC of R on originals vs negatives, by answer type, with a paired cluster bootstrap. A2: Spearman correlations among I, R, S, acc and comparators. A3: battery robustness. A4: self-consistency agreement. A5: dataset × cell counts. A6: human audit.
 - **Gates D1–D4** → `gates.json`. **Frame** → `analysis_frame.parquet`, holding `R_eff`, `V_eff`, `in_design`, `cell`, `quintile`. Downstream stages read these labels and never recompute them.
 
@@ -141,7 +161,7 @@ Each subsection gives what a stage must produce and the parameters that are easi
 
 - **16 conditions,** all top-20% rules applied per dataset on frame columns: `zero_shot`, `random`, `top_R`, `top_V`, `top_I_resid` (I residualized on acc and acc²), `judge_quality`, `ifd` (with ifd < 1), four I × S cells, and five I quintiles.
 - **E1-G.** G \~ I + S + I×S + R\_eff + acc + dataset, with standardized predictors; simple slopes of S at the 25th and 75th percentiles of I; joint bootstrap over probes and items, 1,000 replicates.
-- **E1-C and E2.** lme4 logistic models with `(1 | test_item) + (1 | condition:draw)` and a dataset fixed effect; Holm correction over six H2 contrasts. H6: Spearman correlation of G and C condition scores. Gates D5 and D6. Figs. 1–3.
+- **E1-C and E2.** Logistic models with test-item fixed effects (`fe_logit`, Python only) and a two-way cluster bootstrap over test items and draws within condition, plus a dataset fixed effect; Holm correction over six H2 contrasts. H6: Spearman correlation of G and C condition scores. Gates D5 and D6. Figs. 1–3.
 
 ### Spec 6 — Reliability gate and causal manipulation
 
@@ -182,7 +202,7 @@ Tests come in four layers, all in CI; each spec's acceptance list adds stage-spe
 1. **Unit tests** for every shared helper: an `answers_match` suite of 100 hand-written cases (percent forms, scale words, rounding, multi-span); the FinQA executor reproducing `exe_ans` on ≥ 99% of train items; `answer_nll` span tests on toy tokens and 20 hand-picked answers; and snapshot tests freezing `build_messages` output for 10 items per format.
 2. **Schema and invariant tests** on every write: unique IDs, split disjointness, no probe, test, fixed-demo or derived item in any Spec 5 selection list, probabilities in \[0, 1\], and the token budget.
 3. **Statistical tests** on simulated data. Planted effects must be recovered (for example, the H4 sign flip in ≥ 90% of 100 simulations), and null data must keep false positives ≤ 7% over 200 simulations, for E1-G, the C mixed models and the E3 paired tests.
-4. **End-to-end smoke test**, `profile=tiny`: 60 pool, 20 probe and 20 test items per dataset, a model of about 0.5B parameters, and the mock clients. All stages run in under 20 minutes; outputs validate; a second run is byte-identical apart from timestamps.
+4. **End-to-end smoke test**, `profile=tiny`: 60 pool, 20 probe and 20 test items per dataset, a model of about 0.5B parameters (currently a locally built toy model, test-only), and the mock clients. All stages run in under 20 minutes; outputs validate; a second run is byte-identical apart from timestamps.
 
 Three checks catch the errors most likely to stay silent, and deserve priority:
 
@@ -194,9 +214,9 @@ Three checks catch the errors most likely to stay silent, and deserve priority:
 
 Each milestone ends with its tests passing on the tiny profile; full-scale runs start only after milestone 7 passes end to end on the tiny profile and on a 200-item pilot.
 
-1. **Foundation.** Package skeleton, Hydra configs, `io.py` with pandera schemas, `ids.py`, `match.py`, `prompts.py`, the mock clients, and the CI harness with the smoke-test scaffold.
-2. **Data, Spec 1 without Jev.** Loaders for FinQA, TAT-QA and FinanceBench; dedup and leakage removal; the token budget; splits; the executor and evaluator; Q3 templates and the LLM fallback; negatives.
-3. **Jev scoring.** Batched client with caching and `retry-after` handling, the determinism and batching checks, aggregation into R and I. Run on the tiny profile against `MockJev` first.
+1. ✅ **Foundation.** Package skeleton, Hydra configs, `io.py` with pandera schemas, `ids.py`, `match.py`, `prompts.py`, the mock clients, and the CI harness with the smoke-test scaffold.
+2. ✅ **Data, Spec 1 without Jev.** Loaders for FinQA, TAT-QA and FinanceBench; dedup and leakage removal; the token budget; splits; the executor and evaluator; Q3 templates and the LLM fallback; negatives.
+3. ✅ **Jev scoring** (against `MockJev`; the real run waits for the TypeSafe items below). Batched client with caching and `retry-after` handling, the determinism and batching checks, aggregation into R and I.
 4. **Base-model scoring, Spec 2.** `answer_nll` with the span logic, sampling, extraction, the S percentile.
 5. **E0 and gates, Spec 3.** Comparators, A1–A6, gates D1–D4, the frame, the H1 verdict.
 6. **Proxies, Spec 4.** `compute_influence` with its sanity checks, then `run_condition`, including `demo_plan`.
@@ -215,12 +235,29 @@ The specs refine protocol v1 in documented places; the full table, with reasons,
 - Gate D4 counts per dataset × cell, against 100.
 - The mixed models add a dataset fixed effect, and nest draw in condition, except in Spec 6's paired models, where draws are crossed.
 
+**Implementation decisions.** Choices made while building milestones 1–3 are listed in the plan's owner decisions log, each with its reason. The ones most relevant here:
+- Python only;
+- human labeling through CSV files, never Argilla;
+- one batched Jev request per item;
+- case-insensitive span verification for TAT-QA;
+- accounting negatives in TAT-QA derivations;
+- templates for FinQA table-operation items.
+
 **Open items, blocking: confirm before coding the dependent stage.**
 
-- [ ] FinQA, TAT-QA and FinanceBench field names against the downloaded files; whether TAT-QA test gold answers are public (Spec 1).
-- [ ] From TypeSafe's API reference: the response field holding a noul answer's probability, and whether the per-request token overhead (about 260 tokens) is billed as measured; `jev.model` pinned to `jev-1.13.0` or a later versioned ID chosen before scoring starts (Spec 1).
-- [ ] `model.base`: an open 7–8B instruct checkpoint, not finance-tuned, with a context of at least 16,384 tokens and a chat template whose reasoning mode can be switched off; record the revision hash (Spec 2).
-- [ ] `model.strong`: a frontier API model with structured output (Specs 1, 3).
+- [x] FinQA, TAT-QA and FinanceBench field names against the downloaded files; whether TAT-QA test gold answers are public (Spec 1). *Confirmed; TAT-QA test gold is public.*
+- [x] ~~From TypeSafe's API reference: the response fields and the authentication header.~~ *Resolved 2026-10-24* from https://docs.typesafe.ai/api/system-one and live responses: `Authorization: Bearer <key>`; answers in `answers.<qid>.noul` (P(yes), rounded to 0.01); reported model in `model`; request ID in the `x-typesafe-request-id` response header. `GET /v1/models` lists only the aliases `jev-latest` and `jev-preview`, both resolving to `jev-1.14.0`; the versioned ID `jev-1.14.0` is served and reported back when requested, and the study pins it.
+- [ ] Ask TypeSafe whether the per-request token overhead (about 260 tokens) is billed as measured, and how long the versioned ID `jev-1.14.0` stays available (Spec 1).
+- [x] `model.base` (Spec 2). *OLMo 3 7B Instruct, revision recorded; its chat template has no reasoning block.*
+- [x] `model.strong` (Specs 1, 3). *Qwen3-235B-A22B-Instruct-2507 via OpenRouter.*
 - [ ] The pysbd version, and its agreement with FinQA sentence indices on 50 items per dataset (Spec 6).
 - [ ] Two annotators for the CSV annotation tasks (Specs 1, 3).
 - [ ] Whether the GPU budget allows CBI sampling on 10 draws, or only 5 (Spec 4).
+- [ ] Values the specs leave blank, still to decide:
+  - LoRA and projection seeds (P1, milestone 6);
+  - judge-quality prompt wording (P3, milestone 5);
+  - top-20% rounding and tie-breaking (P8, milestone 7).
+  
+  Already decided: the Q3 fallback prompt (P4) and self-consistency sampling (P5).
+- [ ] The ~0.5B tiny-profile model (milestone 4).
+- [ ] Before using the strong model: ask TypeSafe whether Jev is built on a Qwen model.

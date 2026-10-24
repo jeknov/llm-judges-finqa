@@ -98,3 +98,16 @@ def test_negative_gold_value_is_json_serialisable():
         if item_id.startswith("financebench"):
             continue
         json.dumps(wrong(ITEMS[item_id])["gold_value"])
+
+
+@pytest.mark.spec("S1-15")
+def test_multi_span_numeric_with_placeholder_first_span():
+    """Real TAT-QA case: the first span is a dash, so the number to change is in the second span."""
+    item = dict(ITEMS["tatqa:q-span"], answer_type="lookup", scale="thousand",
+                gold_answer="-; 5,713; - thousand", gold_value=json.dumps(["-", "5,713", "-"]))
+    out = wrong(item)
+    assert out is not None
+    spans = out["gold_value"]
+    assert spans[0] == "-" and spans[2] == "-" and spans[1] != "5,713"
+    assert spans[1] in out["gold_answer"]
+    assert not answers_match(spans, gold_for_match(item), "lookup")

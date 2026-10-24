@@ -1,6 +1,6 @@
 # Spec 1, Jev battery scoring.
 battery_version: v0
-model: jev-1.13.0                # pinned versioned ID, never an alias (Spec 1, Client interface)
+model: jev-1.14.0                # pinned versioned ID, never an alias (Spec 1, Client interface)
 endpoint: https://api.typesafe.ai/v1/systemone
 question_type: noul
 determinism:
@@ -8,14 +8,18 @@ determinism:
   tolerance: 0.01
   repeats: 3
 batching_margin: 0.01            # batched may differ from single-question by the repeat difference + this
-# Response mapping and authentication must come from TypeSafe's API reference (Spec 1, Open items).
+# Response mapping and authentication, from TypeSafe's API reference
+# (https://docs.typesafe.ai/api/system-one) and checked against live responses on 2026-10-24:
+#   body {"model": "jev-1.14.0", "answers": {"q1": {"type": "noul", "noul": 0.99}}, "usage": {...}};
+#   request ID in the x-typesafe-request-id response header. Probabilities arrive rounded to 0.01.
 api:
   key_env: TYPESAFE_API_KEY      # environment variable holding the API key (operational)
-  auth_header: ???               # OWNER DECISION PENDING — header carrying the key, from the API reference
-  answers_field: ???             # OWNER DECISION PENDING — response field holding the per-question answers
-  probability_field: ???         # OWNER DECISION PENDING — field holding a noul answer's probability
-  request_id_field: ???          # OWNER DECISION PENDING — response field with the request ID
-  model_field: ???               # OWNER DECISION PENDING — response field with the reported versioned model ID
+  auth_header: Authorization
+  auth_scheme: Bearer            # header value is "Bearer <key>"
+  answers_field: answers         # per-question answers, keyed by question ID
+  probability_field: noul        # P(yes) of a noul answer, 0 to 1
+  request_id_header: x-typesafe-request-id
+  model_field: model             # versioned model that answered; must equal jev.model
   timeout_s: 120
 # Operational settings for the real client (not analysis parameters).
 retry:

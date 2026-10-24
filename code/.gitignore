@@ -12,6 +12,10 @@ __pycache__/
 /runs/
 /grads/
 /annotation/
+# Spec 1 stage outputs under data/ (data/raw itself is tracked through data/raw.dvc)
+/data/*
+!/data/raw.dvc
+!/data/.gitignore
 /results/*
 # ...except the two files the specs say are committed
 !/results/gates.json
