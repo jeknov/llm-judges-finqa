@@ -1,0 +1,26 @@
+# @package _global_
+# End-to-end smoke-test profile (Spec 1, Testing strategy, layer 4).
+# Values marked TEST-ONLY are stand-ins so the pipeline runs offline with mocks; they are not pre-registered.
+defaults:
+  - /model@model.base: toy
+
+profile: tiny
+backend: hf
+clients:
+  jev: mock
+  strong: mock
+
+data:
+  sizes:
+    pool_per_dataset: 60
+    probe_per_dataset: 20
+    test_per_dataset: 20
+    financebench_max: 20          # TEST-ONLY
+  negatives:
+    n: 20                         # TEST-ONLY (spec: 1,000)
+  q3:
+    validation_n: 10              # TEST-ONLY (spec: 100)
+
+jev:
+  determinism:
+    n_items: 10                   # TEST-ONLY (spec: 200)

@@ -1,0 +1,2 @@
+# DVC parameters: which Hydra profile `dvc repro` runs (tiny | pilot | full).
+profile: tiny

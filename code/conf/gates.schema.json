@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "results/gates.json (Spec 3, gates.json schema)",
+  "type": "object",
+  "required": ["battery_version", "computed_at", "git_commit", "gates", "flags", "derived"],
+  "additionalProperties": false,
+  "properties": {
+    "battery_version": {"type": "string"},
+    "computed_at": {"type": "string"},
+    "git_commit": {"type": "string"},
+    "gates": {
+      "type": "object",
+      "required": ["D1", "D2", "D3", "D4", "D5", "D6"],
+      "additionalProperties": false,
+      "properties": {
+        "D1": {"$ref": "#/$defs/gate_ci"},
+        "D2": {"$ref": "#/$defs/gate_ci"},
+        "D3": {"$ref": "#/$defs/gate_ci"},
+        "D4": {"$ref": "#/$defs/gate_count"},
+        "D5": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/gate_generic"}]},
+        "D6": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/gate_generic"}]}
+      }
+    },
+    "flags": {
+      "type": "object",
+      "required": ["abs_rho_I_pvi", "abs_rho_I_icl_reducible", "novelty_flag"],
+      "properties": {
+        "abs_rho_I_pvi": {"type": ["number", "null"]},
+        "abs_rho_I_icl_reducible": {"type": ["number", "null"]},
+        "novelty_flag": {"type": "boolean"}
+      }
+    },
+    "derived": {
+      "type": "object",
+      "required": ["halt", "halt_reason", "r_source_arith", "r_threshold", "cells_r_filter", "medians",
+                   "halt_spec6", "halt_spec6_override", "single_proxy_claims"],
+      "additionalProperties": false,
+      "properties": {
+        "halt": {"type": "boolean"},
+        "halt_reason": {"enum": [null, "difficulty_proxy", "not_separable"]},
+        "r_source_arith": {"enum": ["jev", "execution"]},
+        "r_threshold": {"type": "number", "minimum": 0, "maximum": 1},
+        "cells_r_filter": {"type": "boolean"},
+        "medians": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["I", "S"],
+            "properties": {"I": {"type": "number"}, "S": {"type": "number"}}
+          }
+        },
+        "halt_spec6": {"type": "boolean"},
+        "halt_spec6_override": {"type": ["string", "null"]},
+        "single_proxy_claims": {"type": "boolean"}
+      }
+    }
+  },
+  "$defs": {
+    "gate_ci": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "required": ["metric", "value", "ci", "threshold", "triggered"],
+          "properties": {
+            "metric": {"type": "string"},
+            "value": {"type": "number"},
+            "ci": {"type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 2},
+            "threshold": {"type": "number"},
+            "triggered": {"type": "boolean"}
+          }
+        }
+      ]
+    },
+    "gate_count": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "required": ["metric", "value", "threshold", "triggered"],
+          "properties": {
+            "metric": {"type": "string"},
+            "value": {"type": "integer"},
+            "threshold": {"type": "integer"},
+            "triggered": {"type": "boolean"}
+          }
+        }
+      ]
+    },
+    "gate_generic": {
+      "type": "object",
+      "required": ["metric", "triggered"],
+      "properties": {"metric": {"type": "string"}, "triggered": {"type": "boolean"}}
+    }
+  }
+}

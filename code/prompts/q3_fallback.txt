@@ -1,0 +1,14 @@
+# STATUS: DRAFT — awaiting owner approval (placeholder P4). Pilot and full runs refuse to load it until
+# this line reads "# STATUS: FINAL". Lines starting with "# " at the top are stripped before use.
+You are given a financial question, its context and a stated answer.
+
+{item}
+
+Write one short check statement that must be true whenever the stated answer is true.
+Requirements:
+- The check must follow from the stated answer together with the context.
+- The check must not restate the answer.
+- The check must be decidable from the context alone.
+- Prefer the direction or sign of a change, consistency with a stated total, the ordering of two quantities, the magnitude of a value, or its unit.
+
+Return JSON with the fields check_text (the statement), check_type (one of: direction, total, ordering, magnitude, unit) and holds_if_answer_true (true if the check is true whenever the stated answer is true).

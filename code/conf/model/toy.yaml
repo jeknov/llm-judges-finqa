@@ -1,0 +1,6 @@
+# TEST-ONLY stand-in for the ~0.5B tiny-profile model: a randomly initialised toy model built locally
+# by fqsel/backends/toy.py (no download). Replaced by the owner's choice of a real small model at M4.
+name: toy
+revision: local
+dtype: float32
+min_context: 16384

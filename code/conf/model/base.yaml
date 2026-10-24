@@ -1,0 +1,5 @@
+# model.base — the frozen 7–8B open instruct checkpoint used by Specs 2–6 unchanged.
+name: ???            # OWNER DECISION PENDING — Blocking questions: external facts #1
+revision: ???        # OWNER DECISION PENDING — exact Hugging Face revision hash
+dtype: bfloat16
+min_context: 16384

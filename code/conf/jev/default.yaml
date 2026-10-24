@@ -1,0 +1,14 @@
+# Spec 1, Jev battery scoring.
+battery_version: v0
+options: ["yes", "no"]          # quoted: bare yes/no are booleans in YAML
+model_version: ???               # OWNER DECISION PENDING — from TypeSafe documentation (external facts #2)
+determinism:
+  n_items: 200
+  tolerance: 0.01
+  repeats: 3
+# Operational settings for the real client (not analysis parameters).
+retry:
+  max_attempts: 6
+  base_delay_s: 1.0
+  max_delay_s: 60.0
+max_workers: 8

@@ -1,0 +1,54 @@
+[
+  {
+    "id": "GOLD/2019/page_1.pdf-1",
+    "pre_text": ["revenue grew strongly in 2019 .", "the company expanded abroad ."],
+    "post_text": ["management expects further growth ."],
+    "table": [["", "2019", "2018"], ["net sales", "$ 1,200", "$ 1,000"], ["cost of sales", "$ 700", "$ 650"]],
+    "qa": {
+      "question": "what was the percentage change in net sales from 2018 to 2019?",
+      "answer": "20%",
+      "program": "subtract(1200, 1000), divide(#0, 1000)",
+      "exe_ans": 0.2,
+      "gold_inds": {"text_0": "revenue grew strongly in 2019 .", "table_1": "net sales ..."}
+    }
+  },
+  {
+    "id": "GOLD/2019/page_2.pdf-3",
+    "pre_text": ["sales are reported in millions ."],
+    "post_text": [],
+    "table": [["", "2019", "2018"], ["net sales", "1200", "1000"]],
+    "qa": {
+      "question": "were net sales in 2019 greater than in 2018?",
+      "answer": "yes",
+      "program": "greater(1200, 1000)",
+      "exe_ans": "yes",
+      "gold_inds": {"table_1": "net sales ..."}
+    }
+  },
+  {
+    "id": "GOLD/2019/page_3.pdf-2",
+    "pre_text": ["the table shows net sales ."],
+    "post_text": ["no other segments ."],
+    "table": [["", "2019", "2018"], ["net sales", "$ 1,200", "$ 1,000"]],
+    "qa": {
+      "question": "what was the highest net sales value?",
+      "answer": "1200",
+      "program": "table_max(net sales, none)",
+      "exe_ans": 1200.0,
+      "gold_inds": {"table_1": "net sales ..."}
+    }
+  },
+  {
+    "id": "GOLD/2019/page_4.pdf-1",
+    "pre_text": ["if rates change by 100 basis points , interest expense would change by $ 3.8 million ."],
+    "post_text": [],
+    "table": [],
+    "qa": {
+      "question": "what is the interest expense change per basis point?",
+      "answer": "380",
+      "program": "divide(3.8, const_1)",
+      "exe_ans": 3.8,
+      "gold_inds": {"text_0": "if rates change ..."}
+    }
+  }
+]

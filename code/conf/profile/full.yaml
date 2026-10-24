@@ -1,0 +1,10 @@
+# @package _global_
+# Full run on the GPU node. Refuses to load while any placeholder remains.
+defaults:
+  - /model@model.base: base
+
+profile: full
+backend: vllm
+clients:
+  jev: real
+  strong: real

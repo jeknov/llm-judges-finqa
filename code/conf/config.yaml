@@ -1,0 +1,18 @@
+# Root config. Every parameter of the study lives under conf/; no constants in code (Spec 1, Config).
+# Values the specs leave blank are `???` (Hydra MISSING) with a pointer to the plan's placeholder table.
+defaults:
+  - data: default
+  - jev: default
+  - strong@model.strong: default
+  - annotation: default
+  - proxy: influence
+  - stats: default
+  - profile: tiny
+  - _self_
+
+global_seed: 20261022
+
+paths:
+  root: .            # relative to code/; tests override this with a temp dir
+  raw: data/raw
+  cache: .cache

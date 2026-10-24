@@ -1,0 +1,32 @@
+[
+  {
+    "table": {
+      "uid": "t-gold",
+      "table": [["", "2019", "2018"], ["Revenue", "1,617", "1,434"], ["Europe", "300", "200"], ["North America", "500", "400"]]
+    },
+    "paragraphs": [
+      {"uid": "p-b", "order": 2, "text": "Revenue grew in Europe and North America."},
+      {"uid": "p-a", "order": 1, "text": "The Company operates in two regions."}
+    ],
+    "questions": [
+      {"uid": "q-arith", "order": 1, "question": "What is the percentage change in revenue?", "answer": 12.76,
+       "derivation": "(1,617-1,434)/1,434", "answer_type": "arithmetic", "answer_from": "table",
+       "rel_paragraphs": [], "req_comparison": false, "scale": "percent"},
+      {"uid": "q-count", "order": 2, "question": "How many regions does the company operate in?", "answer": "2",
+       "derivation": "Europe ## North America", "answer_type": "count", "answer_from": "table-text",
+       "rel_paragraphs": ["1"], "req_comparison": false, "scale": ""},
+      {"uid": "q-span", "order": 3, "question": "Which region had revenue of 300?", "answer": ["Europe"],
+       "derivation": "", "answer_type": "span", "answer_from": "text",
+       "rel_paragraphs": ["2"], "req_comparison": false, "scale": ""},
+      {"uid": "q-multi", "order": 4, "question": "Which regions are listed?", "answer": ["Europe", "North America"],
+       "derivation": "", "answer_type": "multi-span", "answer_from": "table",
+       "rel_paragraphs": [], "req_comparison": false, "scale": ""},
+      {"uid": "q-neg", "order": 5, "question": "What is the change in revenue?", "answer": 183,
+       "derivation": "1,617 - 1,434", "answer_type": "arithmetic", "answer_from": "table",
+       "rel_paragraphs": [], "req_comparison": false, "scale": "thousand"},
+      {"uid": "q-acct", "order": 6, "question": "What is the net change?", "answer": 14491,
+       "derivation": "7,572 - (6,919)", "answer_type": "arithmetic", "answer_from": "table",
+       "rel_paragraphs": [], "req_comparison": false, "scale": ""}
+    ]
+  }
+]

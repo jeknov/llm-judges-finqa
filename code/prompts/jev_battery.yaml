@@ -1,0 +1,11 @@
+# STATUS: FINAL
+# Spec 1, Jev battery scoring, Prompts. Frozen before any score is looked at; changing a wording
+# invalidates all scores and requires bumping jev.battery_version. Snapshot-tested.
+orig:
+  q1: "Given the context and question, is the stated answer supported by the context?"
+  q2: "Do the context and question determine this answer uniquely, such that no materially different answer would also be defensible?"
+  q3: "Assume the stated answer is true. Does it entail the following check? Check: {check_text}"
+para:
+  q1: "Does the information provided back up the answer given to this question?"
+  q2: "Is this the only reasonable answer to the question given the information, rather than one of several defensible answers?"
+  q3: "If the answer given is correct, must the following statement also be correct? Statement: {check_text}"

@@ -1,0 +1,40 @@
+# Spec 1, Pool construction. Raw files are relative to paths.raw.
+datasets: [finqa, tatqa]
+raw_files:
+  finqa:
+    train: finqa/train.json
+    dev: finqa/dev.json
+    test: finqa/test.json
+  tatqa:
+    train: tatqa/tatqa_dataset_train.json
+    dev: tatqa/tatqa_dataset_dev.json
+    test: tatqa/tatqa_dataset_test_gold.json   # TAT-QA test gold answers are public
+  financebench:
+    test: financebench/financebench_open_source.jsonl
+
+token_budget:
+  pool: 2048          # pool, probe and fixed_demo items
+  test: 4096          # test items
+
+sizes:
+  pool_per_dataset: null      # null = every surviving train item
+  probe_per_dataset: 250
+  fixed_demo_per_dataset: 4
+  test_per_dataset: 500
+  financebench_max: null      # null = every surviving FinanceBench item
+
+dedup:
+  jaccard_threshold: 0.9
+  num_perm: 128               # P6 — owner decision 2026-10-23
+  shingle_words: 5            # P6 — owner decision 2026-10-23 (lowercased whitespace tokens)
+
+negatives:
+  n: 1000
+  factors: [0.5, 0.8, 1.25, 2.0]
+  max_redraws: 5
+  tag: neg
+
+q3:
+  validation_n: 100
+  accept_rate: 0.9
+  template_check_n: 50          # hand-checked items per template

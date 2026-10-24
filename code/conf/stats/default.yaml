@@ -1,0 +1,4 @@
+# Statistical settings (Specs 3, 5, 6). Filled in at M5–M8.
+top_fraction: 0.2
+top_rounding: ???                # P8 — OWNER DECISION PENDING (asked at M7)
+top_tie_break: ???               # P8 — OWNER DECISION PENDING (asked at M7)

@@ -1,0 +1,4 @@
+{"financebench_id": "financebench_id_00001", "question": "What is the FY2018 capital expenditure (in USD millions)?", "answer": "$1577.00", "question_type": "metrics-generated", "evidence": [{"evidence_text": "Purchases of property, plant and equipment (1,577)"}]}
+{"financebench_id": "financebench_id_00002", "question": "What is the FY2019 dividend per share?", "answer": "8.70", "question_type": "metrics-generated", "evidence": [{"evidence_text": "Dividends declared per share 8.70"}, {"evidence_text": "Paid quarterly."}]}
+{"financebench_id": "financebench_id_00003", "question": "Is the company managing capex efficiently?", "answer": "Yes, capex was managed efficiently.", "question_type": "domain-relevant", "evidence": [{"evidence_text": "Capex fell."}]}
+{"financebench_id": "financebench_id_00004", "question": "What is FY2020 revenue?", "answer": "$12.3 billion", "question_type": "metrics-generated", "evidence": []}

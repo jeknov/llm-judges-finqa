@@ -1,0 +1,10 @@
+# Spec 4, Proxy G. Implemented at M6.
+lora:
+  rank: 16
+  alpha: 32
+  dropout: 0.0
+  target_modules: [q_proj, k_proj, v_proj, o_proj]
+  seed: ???                      # P1 — OWNER DECISION PENDING (asked at M6)
+projection:
+  dim: 8192
+  seed: ???                      # P1 — OWNER DECISION PENDING (asked at M6)

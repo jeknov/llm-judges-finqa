@@ -1,0 +1,14 @@
+# @package _global_
+# 200-item pilot on the GPU node (Spec 4 acceptance). Refuses to load while any placeholder remains.
+defaults:
+  - /model@model.base: base
+
+profile: pilot
+backend: vllm
+clients:
+  jev: real
+  strong: real
+
+data:
+  sizes:
+    pool_per_dataset: 100         # 200 pool items in total, the pilot size named in Spec 4

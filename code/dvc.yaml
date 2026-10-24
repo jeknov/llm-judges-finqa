@@ -1,0 +1,52 @@
+# One DVC stage per pipeline stage (Spec 1, Code layout); dependencies are the tables each stage reads.
+# Stages from M4 on are placeholders until implemented; their outputs are listed when they are built.
+stages:
+  pool:
+    cmd: python -m fqsel run pool profile=${profile}
+    deps: [fqsel/stages/pool.py, fqsel/data, fqsel/verify, data/raw, conf/data]
+    outs: [data/pool.parquet, data/dedup_log.csv, data/exclusions.csv, data/split_manifest.json]
+  verify:
+    cmd: python -m fqsel run verify profile=${profile}
+    deps: [fqsel/stages/verify.py, fqsel/verify, data/pool.parquet]
+    outs: [data/verified.parquet]
+  q3:
+    cmd: python -m fqsel run q3 profile=${profile}
+    deps: [fqsel/stages/q3.py, fqsel/checks.py, prompts/q3_fallback.txt, data/pool.parquet]
+    outs: [data/q3_checks.parquet, data/q3_dropped.csv]
+  jev:
+    cmd: python -m fqsel run jev profile=${profile}
+    deps: [fqsel/stages/jev.py, prompts/jev_battery.yaml, data/pool.parquet, data/q3_checks.parquet]
+    outs: [scores/jev_scores_long.parquet, scores/jev_scores.parquet, results/jev_determinism.json]
+  surprisal:
+    cmd: python -m fqsel run surprisal profile=${profile}
+    deps: [data/pool.parquet]
+  comparators:
+    cmd: python -m fqsel run comparators profile=${profile}
+    deps: [data/pool.parquet]
+  e0:
+    cmd: python -m fqsel run e0 profile=${profile}
+    deps: [scores/jev_scores.parquet]
+  gates:
+    cmd: python -m fqsel run gates profile=${profile}
+    deps: [scores/jev_scores.parquet]
+  frame:
+    cmd: python -m fqsel run frame profile=${profile}
+    deps: [scores/jev_scores.parquet]
+  influence:
+    cmd: python -m fqsel run influence profile=${profile}
+    deps: [data/pool.parquet]
+  icl:
+    cmd: python -m fqsel run icl profile=${profile}
+    deps: [data/pool.parquet]
+  e1:
+    cmd: python -m fqsel run e1 profile=${profile}
+    deps: [data/pool.parquet]
+  e2:
+    cmd: python -m fqsel run e2 profile=${profile}
+    deps: [data/pool.parquet]
+  e3:
+    cmd: python -m fqsel run e3 profile=${profile}
+    deps: [data/pool.parquet]
+  figures:
+    cmd: python -m fqsel run figures profile=${profile}
+    deps: [fqsel/stages]

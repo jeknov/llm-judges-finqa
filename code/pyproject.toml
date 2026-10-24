@@ -1,0 +1,64 @@
+[project]
+name = "fqsel"
+version = "0.1.0"
+description = "Implication-weighted data selection for financial QA (protocol v1, training-free)"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "numpy>=1.26,<2.3",
+    "pandas>=2.2,<2.4",
+    "pyarrow>=16",
+    "pandera>=0.20,<0.27",
+    "hydra-core>=1.3,<1.4",
+    "omegaconf>=2.3,<2.4",
+    "scipy>=1.13",
+    "statsmodels>=0.14",
+    "scikit-learn>=1.5",
+    "datasketch>=1.6",
+    "pysbd==0.3.4",
+    "filelock>=3.13",
+    "jsonschema>=4.22",
+    "matplotlib>=3.8",
+    "transformers>=4.44,<5",
+    "tokenizers>=0.19",
+    "torch>=2.3",
+    "jinja2>=3.1",
+]
+
+[project.optional-dependencies]
+gpu = ["vllm", "peft"]
+dev = ["pytest>=8", "hypothesis>=6.100", "ruff>=0.5", "dvc>=3.50"]
+
+[project.scripts]
+fqsel = "fqsel.cli:main"
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["fqsel*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+markers = [
+    "unit: unit tests for a single helper",
+    "schema: schema and invariant tests",
+    "stats: simulation-based statistical tests",
+    "e2e: end-to-end smoke tests",
+    "gpu: needs a CUDA GPU (vLLM)",
+    "api: needs external API credentials",
+    "real_data: needs the downloaded raw data",
+    "slow: takes more than a minute",
+    "spec(id): links a test to a spec acceptance item in tests/ACCEPTANCE.md",
+]
+addopts = "-m 'not gpu and not api and not real_data and not slow' --strict-markers"
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = ["E501"]

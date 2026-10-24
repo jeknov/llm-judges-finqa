@@ -1,0 +1,142 @@
+{
+  "financebench:financebench_id_00001": {
+    "direct": [
+      {
+        "content": "Context:\nPurchases of property, plant and equipment (1,577)\n\nQuestion: What is the FY2018 capital expenditure (in USD millions)?\n\nGive only the final answer, with units if any.",
+        "role": "user"
+      }
+    ],
+    "reason": [
+      {
+        "content": "Context:\nPurchases of property, plant and equipment (1,577)\n\nQuestion: What is the FY2018 capital expenditure (in USD millions)?\n\nReason briefly, then give the final answer on its own last line as: Answer: <value>",
+        "role": "user"
+      }
+    ]
+  },
+  "financebench:financebench_id_00002": {
+    "direct": [
+      {
+        "content": "Context:\nDividends declared per share 8.70\nPaid quarterly.\n\nQuestion: What is the FY2019 dividend per share?\n\nGive only the final answer, with units if any.",
+        "role": "user"
+      }
+    ],
+    "reason": [
+      {
+        "content": "Context:\nDividends declared per share 8.70\nPaid quarterly.\n\nQuestion: What is the FY2019 dividend per share?\n\nReason briefly, then give the final answer on its own last line as: Answer: <value>",
+        "role": "user"
+      }
+    ]
+  },
+  "finqa:GOLD/2019/page_1.pdf-1": {
+    "direct": [
+      {
+        "content": "Context:\nrevenue grew strongly in 2019 .\nthe company expanded abroad .\n\nTable:\n|  | 2019 | 2018 |\n| net sales | $ 1,200 | $ 1,000 |\n| cost of sales | $ 700 | $ 650 |\n\nmanagement expects further growth .\n\nQuestion: what was the percentage change in net sales from 2018 to 2019?\n\nGive only the final answer, with units if any.",
+        "role": "user"
+      }
+    ],
+    "reason": [
+      {
+        "content": "Context:\nrevenue grew strongly in 2019 .\nthe company expanded abroad .\n\nTable:\n|  | 2019 | 2018 |\n| net sales | $ 1,200 | $ 1,000 |\n| cost of sales | $ 700 | $ 650 |\n\nmanagement expects further growth .\n\nQuestion: what was the percentage change in net sales from 2018 to 2019?\n\nReason briefly, then give the final answer on its own last line as: Answer: <value>",
+        "role": "user"
+      }
+    ]
+  },
+  "finqa:GOLD/2019/page_2.pdf-3": {
+    "direct": [
+      {
+        "content": "Context:\nsales are reported in millions .\n\nTable:\n|  | 2019 | 2018 |\n| net sales | 1200 | 1000 |\n\nQuestion: were net sales in 2019 greater than in 2018?\n\nGive only the final answer, with units if any.",
+        "role": "user"
+      }
+    ],
+    "reason": [
+      {
+        "content": "Context:\nsales are reported in millions .\n\nTable:\n|  | 2019 | 2018 |\n| net sales | 1200 | 1000 |\n\nQuestion: were net sales in 2019 greater than in 2018?\n\nReason briefly, then give the final answer on its own last line as: Answer: <value>",
+        "role": "user"
+      }
+    ]
+  },
+  "finqa:GOLD/2019/page_3.pdf-2": {
+    "direct": [
+      {
+        "content": "Context:\nthe table shows net sales .\n\nTable:\n|  | 2019 | 2018 |\n| net sales | $ 1,200 | $ 1,000 |\n\nno other segments .\n\nQuestion: what was the highest net sales value?\n\nGive only the final answer, with units if any.",
+        "role": "user"
+      }
+    ],
+    "reason": [
+      {
+        "content": "Context:\nthe table shows net sales .\n\nTable:\n|  | 2019 | 2018 |\n| net sales | $ 1,200 | $ 1,000 |\n\nno other segments .\n\nQuestion: what was the highest net sales value?\n\nReason briefly, then give the final answer on its own last line as: Answer: <value>",
+        "role": "user"
+      }
+    ]
+  },
+  "finqa:GOLD/2019/page_4.pdf-1": {
+    "direct": [
+      {
+        "content": "Context:\nif rates change by 100 basis points , interest expense would change by $ 3.8 million .\n\nQuestion: what is the interest expense change per basis point?\n\nGive only the final answer, with units if any.",
+        "role": "user"
+      }
+    ],
+    "reason": [
+      {
+        "content": "Context:\nif rates change by 100 basis points , interest expense would change by $ 3.8 million .\n\nQuestion: what is the interest expense change per basis point?\n\nReason briefly, then give the final answer on its own last line as: Answer: <value>",
+        "role": "user"
+      }
+    ]
+  },
+  "tatqa:q-acct": {
+    "direct": [
+      {
+        "content": "Table:\n|  | 2019 | 2018 |\n| Revenue | 1,617 | 1,434 |\n| Europe | 300 | 200 |\n| North America | 500 | 400 |\n\nContext:\nThe Company operates in two regions.\nRevenue grew in Europe and North America.\n\nQuestion: What is the net change?\n\nGive only the final answer, with units if any.",
+        "role": "user"
+      }
+    ],
+    "reason": [
+      {
+        "content": "Table:\n|  | 2019 | 2018 |\n| Revenue | 1,617 | 1,434 |\n| Europe | 300 | 200 |\n| North America | 500 | 400 |\n\nContext:\nThe Company operates in two regions.\nRevenue grew in Europe and North America.\n\nQuestion: What is the net change?\n\nReason briefly, then give the final answer on its own last line as: Answer: <value>",
+        "role": "user"
+      }
+    ]
+  },
+  "tatqa:q-arith": {
+    "direct": [
+      {
+        "content": "Table:\n|  | 2019 | 2018 |\n| Revenue | 1,617 | 1,434 |\n| Europe | 300 | 200 |\n| North America | 500 | 400 |\n\nContext:\nThe Company operates in two regions.\nRevenue grew in Europe and North America.\n\nQuestion: What is the percentage change in revenue?\n\nGive only the final answer, with units if any.",
+        "role": "user"
+      }
+    ],
+    "reason": [
+      {
+        "content": "Table:\n|  | 2019 | 2018 |\n| Revenue | 1,617 | 1,434 |\n| Europe | 300 | 200 |\n| North America | 500 | 400 |\n\nContext:\nThe Company operates in two regions.\nRevenue grew in Europe and North America.\n\nQuestion: What is the percentage change in revenue?\n\nReason briefly, then give the final answer on its own last line as: Answer: <value>",
+        "role": "user"
+      }
+    ]
+  },
+  "tatqa:q-count": {
+    "direct": [
+      {
+        "content": "Table:\n|  | 2019 | 2018 |\n| Revenue | 1,617 | 1,434 |\n| Europe | 300 | 200 |\n| North America | 500 | 400 |\n\nContext:\nThe Company operates in two regions.\nRevenue grew in Europe and North America.\n\nQuestion: How many regions does the company operate in?\n\nGive only the final answer, with units if any.",
+        "role": "user"
+      }
+    ],
+    "reason": [
+      {
+        "content": "Table:\n|  | 2019 | 2018 |\n| Revenue | 1,617 | 1,434 |\n| Europe | 300 | 200 |\n| North America | 500 | 400 |\n\nContext:\nThe Company operates in two regions.\nRevenue grew in Europe and North America.\n\nQuestion: How many regions does the company operate in?\n\nReason briefly, then give the final answer on its own last line as: Answer: <value>",
+        "role": "user"
+      }
+    ]
+  },
+  "tatqa:q-multi": {
+    "direct": [
+      {
+        "content": "Table:\n|  | 2019 | 2018 |\n| Revenue | 1,617 | 1,434 |\n| Europe | 300 | 200 |\n| North America | 500 | 400 |\n\nContext:\nThe Company operates in two regions.\nRevenue grew in Europe and North America.\n\nQuestion: Which regions are listed?\n\nGive only the final answer, with units if any.",
+        "role": "user"
+      }
+    ],
+    "reason": [
+      {
+        "content": "Table:\n|  | 2019 | 2018 |\n| Revenue | 1,617 | 1,434 |\n| Europe | 300 | 200 |\n| North America | 500 | 400 |\n\nContext:\nThe Company operates in two regions.\nRevenue grew in Europe and North America.\n\nQuestion: Which regions are listed?\n\nReason briefly, then give the final answer on its own last line as: Answer: <value>",
+        "role": "user"
+      }
+    ]
+  }
+}

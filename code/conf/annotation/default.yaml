@@ -1,0 +1,10 @@
+# Human labeling through CSV files (Spec 1, Annotation sheets). Never Argilla.
+annotators: [annotator_1, annotator_2]
+labels: ["yes", "no"]
+tasks:
+  q3_validation:                 # Spec 1, Validation: 100 LLM-generated checks
+    item_columns: [item_text, check_text]
+    label_columns: [follows_from_answer]
+  q3_templates:                  # Spec 1, Validation: 50 hand-checked items per template
+    item_columns: [item_text, check_text]
+    label_columns: [follows_from_answer]
