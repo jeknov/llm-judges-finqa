@@ -5,7 +5,7 @@ endpoint: https://api.typesafe.ai/v1/systemone
 question_type: noul
 determinism:
   n_items: 200                   # also the sample for the batched-versus-single-question check
-  tolerance: 0.01
+  tolerance: 0.017              # owner decision 2026-10-24 (was 0.01; pilot repeat difference 0.016)
   repeats: 3
 batching_margin: 0.01            # batched may differ from single-question by the repeat difference + this
 # Response mapping and authentication, from TypeSafe's API reference

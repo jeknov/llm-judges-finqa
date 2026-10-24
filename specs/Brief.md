@@ -23,7 +23,7 @@ This brief is the entry point for implementing the study in code. It summarizes 
 
 Milestones 1–3 of the build order are done: the shared helpers, all of Spec 1 (pool, verification, Q3 checks, negatives, batched Jev scoring) and the CSV annotation workflow. 351 automated tests pass, plus checks on the downloaded data. Every spec acceptance item is tracked in `code/tests/ACCEPTANCE.md`.
 
-At pilot scale, pool, verification and Q3 checks have run on real data, with real Qwen calls for the fallback checks; the Q3 validation CSVs are out to annotators. The Jev client is configured from TypeSafe's API reference and checked against live responses; the pilot Jev run awaits the owner's go-ahead. **No scientific measurement exists yet:** no experiment, hypothesis verdict or gate outcome.
+At pilot scale, pool, verification and Q3 checks have run on real data, with real Qwen calls for the fallback checks; the Q3 validation CSVs are out to annotators. The Jev client is configured from TypeSafe's API reference and checked against live responses; the pilot Jev run is done (299 items, `jev-1.14.0`, batched; single scoring under the determinism tolerance of 0.017, raised from 0.01 after the pilot), and its analysis is in `notebooks/pilot_jev_analysis.ipynb`. **No scientific measurement exists yet:** no experiment, hypothesis verdict or gate outcome.
 
 All three models are chosen; see Models and external services.
 

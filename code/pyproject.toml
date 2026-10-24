@@ -27,6 +27,7 @@ dependencies = [
 [project.optional-dependencies]
 gpu = ["vllm", "peft"]
 dev = ["pytest>=8", "hypothesis>=6.100", "ruff>=0.5", "dvc>=3.50"]
+notebooks = ["ipykernel>=6.29", "nbformat>=5.10", "nbclient>=0.10"]
 
 [project.scripts]
 fqsel = "fqsel.cli:main"

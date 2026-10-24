@@ -192,7 +192,7 @@ Jev scores every pool item and every validation negative on six questions: the b
 
 Negatives get their Q3 check regenerated from the wrong answer with the same rules, so that only Q1 should separate them from originals. They are scored on all six questions, used only in Spec 3, and never enter any selection condition.
 
-**Determinism and batching checks.** Before the full run, score 200 items twice in batched requests. If the mean absolute difference in P(yes) exceeds 0.01, score every item three times and store the mean. On the same 200 items, also score each question in its own single-question request, and confirm that batched and single-question probabilities differ by no more than the repeat difference plus 0.01. If they differ more, score all items one question per request and record the decision in the manifest.
+**Determinism and batching checks.** Before the full run, score 200 items twice in batched requests. If the mean absolute difference in P(yes) exceeds 0.017, score every item three times and store the mean. On the same 200 items, also score each question in its own single-question request, and confirm that batched and single-question probabilities differ by no more than the repeat difference plus 0.01. If they differ more, score all items one question per request and record the decision in the manifest.
 
 **Aggregation.** For each battery b ∈ {orig, para}:
 
