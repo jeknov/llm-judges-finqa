@@ -1,5 +1,5 @@
-# STATUS: DRAFT — awaiting owner approval (placeholder P4). Pilot and full runs refuse to load it until
-# this line reads "# STATUS: FINAL". Lines starting with "# " at the top are stripped before use.
+# STATUS: FINAL — approved by the owner on 2026-10-24 (placeholder P4). Frozen: changing the wording
+# requires regenerating all LLM checks. Lines starting with "# " at the top are stripped before use.
 You are given a financial question, its context and a stated answer.
 
 {item}

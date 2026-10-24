@@ -1,7 +1,32 @@
-# model.strong — frontier API model with structured output (Specs 1, 3).
-name: ???                      # OWNER DECISION PENDING — Blocking questions: external facts #1
-version: ???                   # OWNER DECISION PENDING — version string recorded with every output
+# model.strong — the auxiliary LLM for Q3 fallback checks (Spec 1), the quality judge and
+# self-consistency (Spec 3). Owner decision 2026-10-24: Qwen3-235B-A22B-Instruct-2507 (open weights,
+# non-thinking) via OpenRouter, with one provider pinned so that every call runs on the same deployment.
+name: qwen/qwen3-235b-a22b-2507                  # OpenRouter model ID
+version: Qwen/Qwen3-235B-A22B-Instruct-2507      # weights served (Hugging Face repo, Apache 2.0), FP8 at the provider
+endpoint: https://openrouter.ai/api/v1/chat/completions
+api_key_env: OPENROUTER_API_KEY
+provider:
+  order: [deepinfra/fp8]       # pinned endpoint tag: DeepInfra, FP8 (supports temperature, seed, JSON schema)
+  quantizations: [fp8]
+  allow_fallbacks: false       # never route to another provider or precision
+  require_parameters: true     # refuse endpoints that would ignore temperature/seed/schema
+expected_provider: DeepInfra   # a response reporting any other provider is an error
+timeout_s: 120
+retry:
+  max_attempts: 6
+  base_delay_s: 1.0
+  max_delay_s: 60.0
 q3_first_temperature: 0.0      # first Q3 fallback attempt is greedy; Spec 1 fixes only the retry temperature
 q3_retry_temperature: 0.7      # Spec 1, LLM fallback
 judge_temperature: 0.0         # Spec 3, judge_quality
-sc_temperature: ???            # P5 — OWNER DECISION PENDING (asked at M5)
+# Self-consistency sampling (Spec 3; P5, owner decision 2026-10-24). Temperature 0.7 matches every other
+# sampled measure in the study (Spec 2 accuracy, Spec 4 CBI) and the model developers' recommendation;
+# top_p/top_k/min_p are Qwen's recommended values for this model; max_tokens matches Spec 2's reason format.
+self_consistency:
+  n_samples: 5                 # Spec 3
+  temperature: 0.7
+  top_p: 0.8
+  top_k: 20
+  min_p: 0.0
+  max_tokens: 512
+  seed_label: sc               # sample k uses stable_seed(global_seed, item_id, "sc", k)

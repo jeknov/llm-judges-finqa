@@ -4,7 +4,7 @@ Status as of 23 October 2026. Sources: [Protocol v1](<../specs/Protocol v1 (Trai
 
 ## Summary
 
-The code base (`code/`, package `fqsel`) is built up to milestone M3 of the Implementation Plan. That covers all of Spec 1: the item pool, verification, Q3 checks, validation negatives and Jev scoring. It also covers the shared infrastructure every later spec relies on. All 333 automated tests pass, and so do the checks on the downloaded data. The base model is chosen: OLMo 3 7B Instruct (see below).
+The code base (`code/`, package `fqsel`) is built up to milestone M3 of the Implementation Plan. That covers all of Spec 1: the item pool, verification, Q3 checks, validation negatives and Jev scoring. It also covers the shared infrastructure every later spec relies on. All 333 automated tests pass, and so do the checks on the downloaded data. Both models are chosen: OLMo 3 7B Instruct as `model.base` and Qwen3-235B-A22B-Instruct-2507 via OpenRouter as `model.strong` (see below).
 
 So far the pipeline has run only with a test-only toy model and mock Jev and strong-LLM clients. **No scientific measurement has been made yet:** no experiment has run on real scores, no hypothesis has been tested and no gate has been evaluated. The current R and I values come from `MockJev` and are placeholders.
 
@@ -37,6 +37,7 @@ So far the pipeline has run only with a test-only toy model and mock Jev and str
   - no finance-specific training;
   - a 65,536-token context, well above the 16,384 required for four demonstrations plus a test item.
 - **It is reproducible.** Public weights, data and a fixed commit allow full replication.
+- **Apache 2.0.** The model is released under the Apache License 2.0, as declared on its [model card](https://huggingface.co/allenai/Olmo-3-7B-Instruct) (confirmed 24 October 2026 at the pinned revision `6e5971d9eba42665f5bd5a0fcf047f299ce1dccc`; the repository has no separate LICENSE file). Using it, fine-tuning it for the optional anchor, and publishing derived outputs with the paper raise no licensing issue.
 
 **Checks already run** (`pytest -m real_data`):
 - **Chat template:** at the pinned revision, it renders no reasoning block in either prompt format (Spec 2 acceptance S2-09).
@@ -58,6 +59,49 @@ So far the pipeline has run only with a test-only toy model and mock Jev and str
 > We use OLMo 3 7B Instruct (revision `6e5971d`) as the frozen base model. It is a general-purpose instruct model with no finance-specific training, and because its full pre- and post-training data are public, we verified that no FinQA, TAT-QA or FinanceBench item appears in its training corpora (Appendix X). Its 64K-token context accommodates four in-context demonstrations for every test item.
 
 The verification claim in this sentence holds only once the contamination audit has been run and reported in the appendix.
+
+## Strong model (`model.strong`)
+
+**Decision (24 October 2026): Qwen3-235B-A22B-Instruct-2507**, accessed via OpenRouter (`qwen/qwen3-235b-a22b-2507`). Every call is pinned to one provider endpoint: DeepInfra, FP8 weights, no fallbacks, and only endpoints that honour all request parameters. This is set in `code/conf/strong/default.yaml`.
+
+**Role in the protocol.** `model.strong` is an auxiliary tool, not a measured model. It is used three times:
+- **Q3 fallback checks** for lookup items and template failures, about 40% of the pool (Spec 1). These feed I, so they matter for every hypothesis that uses I.
+- **The AlpaGasus-style quality judge** (Spec 3). It is the H2 baseline that residualised I must beat.
+- **Self-consistency** on 3,000 items (Spec 3, E0 analysis A4). It is supporting evidence for H1.
+
+**Why this model.**
+- **Spec settings work as written.** The specs need explicit temperatures (greedy first attempt, retry at 0.7, temperature-0 judge, sampled self-consistency), seeds and JSON-schema output. Claude and OpenAI reasoning models no longer accept temperature, so they would have forced spec changes. Qwen via OpenRouter supports all of these.
+- **Clearly stronger than `model.base`.** It is far above the 7B base model. A strong judge keeps the H2 baseline from being a strawman, and a strong reference makes A4 meaningful. Smaller sizes (14B and below) were rejected for that reason; 30B-A3B was the smallest defensible alternative and saved only about a dollar.
+- **A different family from `model.base`.** OLMo 3 is the base model, so the quality judge does not share its training biases.
+- **Open weights, Apache 2.0.** The model is released under the Apache License 2.0 ([LICENSE](https://huggingface.co/Qwen/Qwen3-235B-A22B-Instruct-2507/blob/main/LICENSE); confirmed 24 October 2026 on the model card, revision `ac9c66cc9b46af7306746a9250f23d47083d689e`). Using it, and publishing its generated outputs with the paper, raises no licensing issue, and it can be self-hosted later if full replicability is needed.
+- **Cost.** About $6 for the whole workload (~44,000 calls, ~38M input and ~4.7M output tokens, at $0.09 / $0.55 per million tokens). Budget about $15–25 including pilots and reruns, compared with about $62–125 for Claude Sonnet 5.5.
+
+**Reproducibility settings and remaining caveats:**
+- **Provider pinning:** every response's provider is checked against the pinned one. A mismatch stops the run. Each call's request ID, provider, model and token usage is logged to `.cache/logs/strong_calls.jsonl`.
+- **No revision pin:** the weights are served in FP8 and OpenRouter does not expose a revision hash, so the provider could redeploy. The paper should name the provider, precision and run dates. All generated checks, judgements and samples are cached and should be published.
+- **Seeds are not a guarantee:** a seed is sent with every request, but GPU serving is not guaranteed to be bit-identical.
+- **Closed training data:** Qwen's training data is closed, so FinQA/TAT-QA contamination cannot be ruled out. This matters most for A4, where memorised answers would look consistently correct. Report the model's zero-shot accuracy on FinQA dev versus test alongside A4. A4 gates nothing.
+
+**Self-consistency settings (P5, decided 24 October 2026).** Five samples per item, each a separate request:
+- temperature 0.7, top-p 0.8, top-k 20, min-p 0;
+- at most 512 new tokens;
+- seed for sample k: `stable_seed(global_seed, item_id, "sc", k)`.
+
+Three independent reasons support temperature 0.7:
+- **Consistency within the study:** every other sampled measure in the specs uses it. That is base-model accuracy (Spec 2: 5 samples at 0.7) and the CBI samples (Spec 4), and the Q3 retry uses 0.7 too. The strong model's consistency (A4) and the base model's accuracy (H1, D2) are therefore measured alike.
+- **The developers' recommendation:** Qwen's model card and default generation settings for this model specify `Temperature=0.7, TopP=0.8, TopK=20, MinP=0`. The reference model runs as its developers intend, and top-p, top-k and min-p follow the same recommendation.
+- **The self-consistency literature:** the original self-consistency work (Wang et al., ICLR 2023) sampled at about 0.5–0.7. Verify the exact settings when citing.
+
+The 512-token limit matches Spec 2's `reason` format. The pinned endpoint (`deepinfra/fp8`) accepts every one of these parameters, and the "required parameters" setting means none is silently dropped. If the pilot shows `sc_modal_share` is almost always 1, report that as a property of the measure rather than changing the temperature after seeing results. The settings live in `code/conf/strong/default.yaml` (`self_consistency`); the self-consistency computation itself is built at M5.
+
+**Still open:**
+- before relying on the judge and the checks: ask TypeSafe whether Jev is built on a Qwen model, which would couple Jev's I and the H2 judge.
+
+**Proposed sentence for the paper:**
+
+> Auxiliary LLM tasks (fallback consequence checks, the quality-judge baseline, and self-consistency) use Qwen3-235B-A22B-Instruct-2507, accessed through OpenRouter with a single pinned provider endpoint (DeepInfra, FP8) between <dates>, with JSON-schema-constrained decoding, fixed temperatures and per-request seeds. We chose an open-weight model from a different family than the base model, so that the quality-judge baseline does not share the base model's training biases, and we release every generated check, judgement and sample.
+
+> For self-consistency we draw five samples per item from the strong model at temperature 0.7 (top-p 0.8, top-k 20, the developers' recommended settings), with fixed per-sample seeds. The temperature matches all other sampled measures in the study.
 
 ## Correspondence to Specs 1–6
 
@@ -131,6 +175,7 @@ None of these alters a pre-registered threshold or hypothesis rule. All are owne
 
 - **Human labeling:** CSV files sent to annotators and returned with labels, never Argilla. Spec 1 and the protocol text were updated to say so.
 - **Base model:** OLMo 3 7B Instruct, chosen for its auditable training data (see Base model above). The protocol leaves the checkpoint open; this fills it.
+- **Strong model:** Qwen3-235B-A22B-Instruct-2507 via OpenRouter with a pinned provider, where the protocol says "frontier API with structured output". An open-weight model was chosen so that the specs' temperatures and seeds work as written (see Strong model above).
 - **Jev cost:** each item is scored in one batched request carrying all six questions, so the state is billed once instead of six times. A 200-item check against single-question requests guards against any coupling, and `jev.model` is pinned to `jev-1.13.0`. This is a Spec 1 change; the battery wording and aggregation are unchanged.
 - **Statistics:** Python only. The protocol's lme4 mixed models become the Spec 5 fixed-effects logit with a cluster bootstrap.
 - **Values the specs left blank, now decided:**
@@ -141,17 +186,15 @@ None of these alters a pre-registered threshold or hypothesis rule. All are owne
   - prompt rendering layout;
   - case-insensitive presence check for TAT-QA spans (strict matching reached only 97.98% against the 99% target);
   - accounting negatives in TAT-QA derivations;
-  - templates applying to FinQA table-operation items.
-- **Still open:**
-  - LoRA and projection seeds (P1), judge-quality prompt (P3), self-consistency temperature (P5) and top-20% rounding (P8);
-  - the drafted Q3 fallback prompt (P4) awaits approval.
+  - templates applying to FinQA table-operation items;
+  - self-consistency sampling (P5): temperature 0.7, top-p 0.8, top-k 20;
+  - Q3 LLM-fallback prompt wording (P4): drafted by Claude, approved by the owner on 24 October 2026 and frozen (`code/prompts/q3_fallback.txt`).
+- **Still open:** LoRA and projection seeds (P1), judge-quality prompt (P3) and top-20% rounding (P8).
 
 ## Blockers and next steps
 
 **Blockers:**
-- Choice of `model.strong`.
 - From TypeSafe's API reference: the response fields (noul probability, request ID, reported model) and the authentication header.
-- Approval of the Q3 fallback prompt.
 - Two annotators for the Q3 validation rounds.
 
 **Next:** M4 (Spec 2, surprisal S and base-model accuracy), then M5, which produces the first scientific results: E0, the H1 verdict and gates D1–D4.

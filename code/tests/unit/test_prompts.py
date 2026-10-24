@@ -117,10 +117,21 @@ def test_jev_battery_matches_spec1_wording():
 
 
 def test_non_final_prompt_refused_outside_tiny(cfg):
-    text = load_prompt("q3_fallback.txt", cfg)  # DRAFT is usable under profile=tiny
-    assert "{item}" in text and not text.startswith("#")
+    load_prompt("judge_quality.txt", cfg)  # a PLACEHOLDER is usable under profile=tiny
     fake = cfg.copy()
     fake._set_flag("struct", False)
     fake.profile = "pilot"
     with pytest.raises(PlaceholderError):
-        load_prompt("q3_fallback.txt", fake)
+        load_prompt("judge_quality.txt", fake)
+
+
+def test_approved_q3_fallback_prompt_loads_for_real_runs(cfg):
+    """P4 approved by the owner on 2026-10-24: the Q3 fallback prompt is FINAL and usable by pilot/full."""
+    from fqsel.config import prompt_status
+
+    assert prompt_status("q3_fallback.txt") == "FINAL"
+    fake = cfg.copy()
+    fake._set_flag("struct", False)
+    fake.profile = "pilot"
+    text = load_prompt("q3_fallback.txt", fake)
+    assert "{item}" in text and not text.startswith("#")

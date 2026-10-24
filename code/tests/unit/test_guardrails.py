@@ -93,8 +93,7 @@ def test_config_is_strict(cfg):
 
 def test_tiny_profile_has_no_missing_values_it_uses(cfg):
     """Tiny runs with mocks; only values not needed by tiny (real models, later milestones) may be ???."""
-    allowed = {"model.strong.name", "model.strong.version", "model.strong.sc_temperature",
-               "jev.api.auth_header", "jev.api.answers_field", "jev.api.probability_field",
+    allowed = {"jev.api.auth_header", "jev.api.answers_field", "jev.api.probability_field",
                "jev.api.request_id_field", "jev.api.model_field", "proxy.lora.seed", "proxy.projection.seed",
                "stats.top_rounding", "stats.top_tie_break"}
     assert set(find_missing(cfg)) <= allowed

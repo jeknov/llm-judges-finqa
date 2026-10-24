@@ -76,6 +76,11 @@ def build_messages(
     return messages
 
 
+def single_user_message(text: str) -> list[dict[str, str]]:
+    """A one-turn chat for the strong LLM (Q3 fallback, judge, self-consistency); no system message."""
+    return [{"role": "user", "content": text}]
+
+
 def _user_turn(item: Mapping, fmt: str) -> str:
     return render_item(item, "qa") + "\n\n" + INSTRUCTIONS[fmt]
 

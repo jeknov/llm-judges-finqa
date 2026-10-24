@@ -21,6 +21,9 @@ Raw data lives in `data/raw/` (tracked by DVC; hashes in `data/raw/MANIFEST`).
 dvc repro                                                # every stage, profile from params.yaml
 ```
 
+Real runs need two API keys in the environment: `TYPESAFE_API_KEY` (Jev) and `OPENROUTER_API_KEY`
+(`model.strong`, Qwen3-235B-A22B-Instruct-2507 pinned to the `deepinfra/fp8` endpoint).
+
 Profiles: `profile=tiny` (default; toy model, mock Jev and strong LLM, Hugging Face backend),
 `profile=pilot` and `profile=full` (vLLM, real clients). Pilot and full refuse to start while any
 owner decision is pending (`???` in `conf/`, or a prompt in `prompts/` not marked `FINAL`).

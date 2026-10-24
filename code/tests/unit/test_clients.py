@@ -174,3 +174,132 @@ def test_strong_client_validates_schema_and_caches(tmp_path):
     bad = StrongClient(MockStrongLLM(responder=lambda p, s, t, seed: {"x": "one"}), JsonCache(tmp_path / "b"))
     with pytest.raises(jsonschema.ValidationError):
         bad.generate_json("p", schema, 0.0, 1)
+
+
+class FakeOpenRouter:
+    """Replaces urllib.request.urlopen for the strong-LLM client: `n_429` rate limits, then a JSON answer."""
+
+    def __init__(self, n_429=0, provider="DeepInfra", content=None):
+        self.n_429, self.provider, self.bodies = n_429, provider, []
+        self.content = content or {"check_text": "The ratio is above 1.", "check_type": "ordering",
+                                   "holds_if_answer_true": True}
+
+    def __call__(self, req, timeout=None):
+        self.bodies.append(json.loads(req.data))
+        self.auth = req.get_header("Authorization")
+        if self.n_429:
+            self.n_429 -= 1
+            raise urllib.error.HTTPError(req.full_url, 429, "Too Many Requests", {"retry-after": "4"}, io.BytesIO(b""))
+        payload = {"id": f"gen-{len(self.bodies)}", "provider": self.provider, "model": "qwen/qwen3-235b-a22b-07-25",
+                   "choices": [{"message": {"role": "assistant", "content": self.content if isinstance(
+                       self.content, str) else json.dumps(self.content)}}],
+                   "usage": {"prompt_tokens": 900, "completion_tokens": 60}}
+        return io.BytesIO(json.dumps(payload).encode())
+
+
+SCHEMA = {"type": "object", "additionalProperties": False, "required": ["check_text", "check_type", "holds_if_answer_true"],
+          "properties": {"check_text": {"type": "string"}, "check_type": {"type": "string"},
+                         "holds_if_answer_true": {"type": "boolean"}}}
+
+
+@pytest.fixture
+def openrouter(cfg, monkeypatch, tmp_path):
+    from fqsel.clients.strong_llm import RealStrongLLM
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "or-secret")
+    fake = FakeOpenRouter(n_429=1)
+    monkeypatch.setattr(urllib.request, "urlopen", fake)
+    sleeps: list[float] = []
+    backend = RealStrongLLM(cfg, log_path=tmp_path / "strong.jsonl", sleep=sleeps.append)
+    return backend, fake, sleeps
+
+
+def test_openrouter_request_pins_provider_and_sampling(openrouter):
+    backend, fake, sleeps = openrouter
+    out = backend.generate_json("PROMPT", SCHEMA, 0.7, 12345)
+    assert out["holds_if_answer_true"] is True
+    body = fake.bodies[-1]
+    assert body["model"] == "qwen/qwen3-235b-a22b-2507"
+    assert body["messages"] == [{"role": "user", "content": "PROMPT"}]
+    assert body["temperature"] == 0.7 and body["seed"] == 12345
+    assert body["response_format"] == {"type": "json_schema",
+                                       "json_schema": {"name": "output", "strict": True, "schema": SCHEMA}}
+    assert body["provider"] == {"order": ["deepinfra/fp8"], "quantizations": ["fp8"],
+                                "allow_fallbacks": False, "require_parameters": True}
+    assert fake.auth == "Bearer or-secret"
+    assert sleeps == [4.0]                      # 429 retried after retry-after
+    assert backend.model_version == "qwen/qwen3-235b-a22b-2507@deepinfra/fp8"
+
+
+def test_openrouter_logs_provider_and_usage(openrouter, tmp_path):
+    backend, _, _ = openrouter
+    backend.generate_json("PROMPT", SCHEMA, 0.0, 1)
+    rec = json.loads((tmp_path / "strong.jsonl").read_text().splitlines()[-1])
+    assert rec["provider"] == "DeepInfra" and rec["usage"]["prompt_tokens"] == 900 and rec["id"] == "gen-2"
+
+
+def test_openrouter_rejects_other_providers(cfg, monkeypatch):
+    from fqsel.clients.strong_llm import ProviderMismatch, RealStrongLLM
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "or-secret")
+    monkeypatch.setattr(urllib.request, "urlopen", FakeOpenRouter(provider="SomeOtherHost"))
+    with pytest.raises(ProviderMismatch):
+        RealStrongLLM(cfg).generate_json("PROMPT", SCHEMA, 0.0, 1)
+
+
+def test_openrouter_needs_api_key(cfg, monkeypatch):
+    from fqsel.clients.strong_llm import RealStrongLLM
+
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    with pytest.raises(RuntimeError, match="OPENROUTER_API_KEY"):
+        RealStrongLLM(cfg)
+
+
+def test_strong_config_is_qwen_via_openrouter(cfg):
+    s = cfg.model.strong
+    assert s.name == "qwen/qwen3-235b-a22b-2507" and s.version == "Qwen/Qwen3-235B-A22B-Instruct-2507"
+    assert list(s.provider.order) == ["deepinfra/fp8"] and s.provider.allow_fallbacks is False
+
+
+def test_self_consistency_settings_p5(cfg):
+    """P5 (owner decision 2026-10-24): temperature 0.7 with Qwen's recommended top_p/top_k/min_p."""
+    from fqsel.clients.strong_llm import sc_sampling
+
+    assert cfg.model.strong.self_consistency.n_samples == 5
+    assert sc_sampling(cfg) == {"temperature": 0.7, "top_p": 0.8, "top_k": 20, "min_p": 0.0, "max_tokens": 512}
+    # Same temperature as every other sampled measure in the study (Spec 2 accuracy, Spec 4 CBI).
+    assert sc_sampling(cfg)["temperature"] == cfg.model.strong.q3_retry_temperature
+
+
+def test_self_consistency_seeds(cfg):
+    from fqsel.clients.strong_llm import sc_seed
+    from fqsel.ids import stable_seed
+
+    seeds = [sc_seed(cfg, "finqa:x", k) for k in range(5)]
+    assert seeds[0] == stable_seed(20261022, "finqa:x", "sc", 0)
+    assert len(set(seeds)) == 5 and sc_seed(cfg, "finqa:y", 0) != seeds[0]
+
+
+def test_openrouter_text_sample_carries_all_sampling_parameters(openrouter, cfg):
+    from fqsel.clients.strong_llm import sc_sampling, sc_seed
+
+    backend, fake, _ = openrouter
+    fake.content = "Reasoning.\nAnswer: 5"
+    out = backend.generate_text("Q", sc_sampling(cfg), sc_seed(cfg, "finqa:x", 2))
+    body = fake.bodies[-1]
+    assert out == "Reasoning.\nAnswer: 5"
+    assert {k: body[k] for k in ("temperature", "top_p", "top_k", "min_p", "max_tokens")} == sc_sampling(cfg)
+    assert body["seed"] == sc_seed(cfg, "finqa:x", 2) % 2**31
+    assert "response_format" not in body and body["provider"]["allow_fallbacks"] is False
+
+
+def test_strong_client_caches_text_samples_per_seed(tmp_path, cfg):
+    from fqsel.clients.strong_llm import sc_sampling
+
+    mock = MockStrongLLM()
+    client = StrongClient(mock, JsonCache(tmp_path / "t"))
+    s = sc_sampling(cfg)
+    a = client.generate_text("Q", s, 1)
+    assert client.generate_text("Q", s, 1) == a and len(mock.calls) == 1
+    client.generate_text("Q", s, 2)
+    assert len(mock.calls) == 2
