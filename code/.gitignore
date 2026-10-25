@@ -5,11 +5,16 @@ __pycache__/
 .pytest_cache/
 .hypothesis/
 .ruff_cache/
-.cache/
+.cache/*
+# archived API responses and logs are tracked by DVC (.cache/<name>.dvc); see README
+!.cache/jev.dvc
+!.cache/strong.dvc
+!.cache/logs.dvc
+!.cache/.gitignore
 
 # Pipeline outputs are tracked by DVC, not git (Spec 1, Determinism)
 /scores/
-/runs/
+# /runs/ (result snapshots) is tracked by DVC through runs.dvc
 /grads/
 /annotation/
 # Spec 1 stage outputs under data/ (data/raw itself is tracked through data/raw.dvc)
@@ -20,3 +25,4 @@ __pycache__/
 # ...except the two files the specs say are committed
 !/results/gates.json
 !/results/hypotheses.csv
+/runs

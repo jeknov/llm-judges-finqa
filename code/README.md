@@ -48,3 +48,16 @@ owner decision is pending (`???` in `conf/`, or a prompt in `prompts/` not marke
 ```
 
 `tests/ACCEPTANCE.md` maps every spec acceptance item to its tests.
+
+## Archived results and API responses (DVC)
+
+Four directories are tracked by DVC rather than git; git holds only their `.dvc` pointer files:
+
+| Path | Contents |
+| --- | --- |
+| `runs/` | Frozen result snapshots, each with a `SHA256SUMS` file: `pilot_2026-10-24` (battery v0), `pilot_v1_2026-10-24`, `pilot_v2_2026-10-25`, `full_v0_2026-10-24` (sensitivity analysis) and `full_v2_2026-10-25` (primary). The analysis notebooks in `../notebooks/` read these. |
+| `.cache/jev/` | Every Jev response, keyed by the SHA-256 of (model, state, questions[, repeat]). |
+| `.cache/strong/` | Every Qwen (model.strong) response. |
+| `.cache/logs/` | Request logs with request IDs, token counts and cost. |
+
+`dvc pull` restores them on another machine once a DVC remote is configured (`dvc remote add -d <name> <url>`, then `dvc push`). After a new run, record the new state with `dvc add runs .cache/jev .cache/strong .cache/logs` and commit the updated `.dvc` files.
