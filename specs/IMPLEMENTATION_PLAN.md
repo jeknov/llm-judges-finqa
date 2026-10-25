@@ -172,7 +172,7 @@ jev-workshop-paper/
 ---
 
 ## M2 — Data (Spec 1 without Jev): `pool`, `verify`, `q3`
-**Status (2026-10-23): done on the tiny profile, on synthetic and on real raw data.** Outstanding: the two human annotation rounds (sheets can be exported now) and a full-size real-data pool build, which needs the `model.base` tokenizer for `qa_tokens`. Field names were confirmed against the downloaded files, and TAT-QA test gold answers are public (`tatqa_dataset_test_gold.json`).
+**Status (2026-10-25): done, including the full-size real-data build** (pilot 2026-10-24, full pool 2026-10-24/25; see the verification log). Outstanding: the two human annotation rounds, whose sheets still need re-exporting from the full pool. Earlier status (2026-10-23): done on the tiny profile, on synthetic and on real raw data. Outstanding then: the two human annotation rounds (sheets can be exported now) and a full-size real-data pool build, which needs the `model.base` tokenizer for `qa_tokens`. Field names were confirmed against the downloaded files, and TAT-QA test gold answers are public (`tatqa_dataset_test_gold.json`).
 - [x] Download raw data manually → `data/raw/`, write MANIFEST; **confirm field names** (blocking)
 - [x] Loaders → pool schema; `answer_type`, `support_ids`, `qa_tokens`
 - [x] Exact dedup; MinHash leakage removal (Jaccard ≥ 0.9) vs probe/test; `dedup_log.csv`
@@ -230,7 +230,7 @@ jev-workshop-paper/
 ---
 
 ## M3 — Jev scoring: `jev`
-**Status (2026-10-23): done against `MockJev`; reworked the same day for batched requests** (Spec 1 change to cut TypeSafe cost: one request per item carrying all six questions). The real client is written to the Spec 1 request format and tested against a fake HTTP endpoint; it refuses to run until the response field names and the authentication header are taken from TypeSafe's API reference (external facts #2).
+**Status (2026-10-25): real runs done** on the pilot (batteries v0, v1, v2) and the full pool (v0 sensitivity, v2 primary), with battery versioning and the answer-free state for v2; see the battery decision under Blocking questions and the verification log. Earlier status (2026-10-23): **done against `MockJev`; reworked the same day for batched requests** (Spec 1 change to cut TypeSafe cost: one request per item carrying all six questions). The real client is written to the Spec 1 request format and tested against a fake HTTP endpoint; it refuses to run until the response field names and the authentication header are taken from TypeSafe's API reference (external facts #2).
 - [x] `jev_ask(state, questions)`: one `POST /v1/systemone` per item, state = `judge` rendering, six noul questions `q1 q2 q3 q1p q2p q3p`, `jev.model` pinned to `jev-1.14.0`
 - [x] Cache keyed on SHA-256 of (model ID, state, canonical JSON of questions); `429` retried with backoff honouring `retry-after`; request IDs and `usage.input_tokens` logged
 - [x] Tiny profile against `MockJev`
@@ -284,7 +284,8 @@ jev-workshop-paper/
 ---
 
 ## M5 — E0 and gates (Spec 3): `comparators`, `e0`, `gates`, `frame`
-- [ ] Comparators: `pvi`, `icl_reducible`, `ifd`, `judge_quality`, self-consistency subsample
+**Status (2026-10-25): self-consistency implemented** (`fqsel/comparators/self_consistency.py`, `python -m fqsel self-consistency`) **and running on the full pool** (3,000 items × 5 samples). The other comparators wait for the GPU (`pvi`, `icl_reducible`, `ifd`) and for P3 (`judge_quality`).
+- [ ] Comparators: `pvi`, `icl_reducible`, `ifd`, `judge_quality`; [x] self-consistency subsample (code; run in progress)
 - [ ] `stats/auroc.py` (paired cluster bootstrap); Spearman + Fisher-z; ICC(2,1); Cohen's κ
 - [ ] A1–A6 tables; gates D1–D4; novelty flags; H1 verdict
 - [ ] `analysis_frame.parquet`
@@ -551,6 +552,8 @@ Real-data, GPU, API and human checks, recorded as they are run. One row per chec
 | 2026-10-25 | 98ecc16+ | Battery v2 pilot test (pre-recorded criteria C1′–C4) | pilot | 1,167 requests sent (499 scoring: 299 judge-state + 200 answer-free, shared by originals and negatives); C1′ ✓, C2 0.582 ✗, C3 ✓, C4 0.965 ✓; ρ(R, I) 0.530 | no | full pool not re-scored; v0/v1 snapshots verified intact |
 | 2026-10-25 | 98ecc16+ | Full Jev run, battery v2 (primary) | full | 20,255 items × 6 questions; 39,905 requests sent (20,251 judge-state 4-question, 19,258 answer-free 2-question, 396 single), 42.5M input tokens ≈ $0.35; determinism 0.0121 → single; batching 0.0118 ≤ 0.0221 → batched; invariants pass | yes | outputs snapshotted to `code/runs/full_v2_2026-10-25/` (SHA256SUMS); live `code/scores/` now v2 |
 | 2026-10-25 | 98ecc16+ | Full-pool battery comparison v0 vs v2 (`notebooks/02_battery_versions_analysis.ipynb`, read-only) | full | ρ(R, I) 0.674 → 0.458 (FinQA 0.804 → 0.516; TAT-QA 0.560 → 0.356); ρ(Q1, Q2) 0.823 → 0.484; AUROC on negatives R 0.942 → 0.942, I 0.930 → 0.713, Q2 0.922 → 0.500; ρ(R v0, R v2) 0.967; top-20% I overlap 56–68% | — | v2 meets C2 on the full pool (0.48 < 0.50) though it missed it on the pilot (0.58); the exception stays disclosed |
+| 2026-10-25 | 2fef82b+ | M4 local tests: answer_nll, surprisal stage | tiny | exact NLL sums; 20 hand-picked answers span-exact with the toy and OLMo 3 tokenizers, 0 adjusted (boundary after "Answer:"; 11 of 20 needed adjustment with the boundary after the space); stage, seed reproducibility (also in a fresh process), S uniformity | yes | vLLM vs fp32 cross-check written as a `gpu` test |
+| 2026-10-25 | 2fef82b+ | Self-consistency run started (full pool, 3,000 items × 5 samples) | full | first attempt with 16 workers stopped on OpenRouter 429s without retry-after after about 33 calls; restarted with 8 workers and 10 retry attempts; early measurement: mean prompt 861, mean completion about 165 tokens, about 0.7 calls/s, projected about $2.50 and about 7 h | — | result row to be added when the run finishes |
 
 ## Owner decisions log
 
@@ -588,3 +591,6 @@ Real-data, GPU, API and human checks, recorded as they are run. One row per chec
 | 2026-10-25 | Jev battery: v2 primary, v0 sensitivity (option 3) | Recorded 2026-10-25 00:34 UTC, before the full v2 run. Battery v2 is the primary battery despite missing pre-set criterion C2 (ρ(Q1, Q2) = 0.58 > 0.50). This is a disclosed exception: C2 was meant to detect answer leakage, and C1′ shows v2 has none by construction. The full v0 run (`code/runs/full_v0_2026-10-24/`) is the pre-registered sensitivity analysis, and every downstream analysis that uses R or I should be reported under both. v1 is reported only as a pilot measurement result. The paper must state that C2 was missed and why v2 was kept |
 | 2026-10-25 | Q3-only I as a pre-specified robustness analysis | Recorded 2026-10-25 00:59 UTC, before any G or C measurement. Besides the primary I (v2 mean of Q2 and Q3) and the v0 sensitivity analysis (I\_v0), every analysis that uses I is also reported with **I\_Q3 = P(yes | Q3)** (I\_Q3\_para = Q3′). This covers Spec 3 A1, A2, A3 and A5 (new A3b) and Spec 5 H2–H4, with Spec 6's E3 to follow. Gates are decided on the primary I only; disagreements are reported as findings. Full-pool preview: ρ(R, I\_Q3) 0.18 (FinQA 0.34), AUROC of I\_Q3 on negatives 0.75, ρ(I\_Q3, I\_Q3\_para) 0.92. I\_Q3 is near its ceiling (61% ≥ 0.95) and heavily tied (98 distinct values; within R ≥ 0.9 all 720 FinQA top-20% slots would be filled by tie-breaking among 1,230 items at 0.99, and 71% of TAT-QA's), so its selections depend on P8's tie-breaking rule, and the tie-decided share must be reported. Implementation note (M5/M7): the analysis frame must carry `I_v0` (from `code/runs/full_v0_2026-10-24/`), `I_Q3` and `I_Q3_para` next to the primary `I` |
 | 2026-10-25 | P1 projection seed changed | Owner set `proxy.projection.seed` to 10242026; the LoRA seed stays 20261024. With distinct seeds, the LoRA A initialisation and the random projection no longer start from the same generator state, so the earlier note about deriving separate streams is no longer needed. No G has been computed, so nothing depends on the old value |
+| 2026-10-25 | Answer span boundary (Spec 2) | Boundary after "Answer:" (before the space), so the span includes the space-prefixed first answer token; required for BPE tokenizers to meet the < 1% adjustment limit. Recorded in Spec 2 |
+| 2026-10-25 | Surprisal raw samples path | `scores/surprisal_samples.parquet` instead of `runs/surprisal/samples.parquet`, because `runs/` is the DVC-tracked snapshot archive. Recorded in Spec 2 |
+| 2026-10-25 | Qwen client retries | 10 attempts (about 4 min of backoff) instead of 6, after OpenRouter 429s without retry-after stopped a 16-worker run; operational, results unaffected |

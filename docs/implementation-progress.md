@@ -1,21 +1,32 @@
 # Implementation progress — Protocol v1 (training-free)
 
-Status as of 23 October 2026. Sources: [Protocol v1](<../specs/Protocol v1 (Training-Free).md>), [Brief](<../specs/Brief.md>), Specs 1–6 in [`specs/`](../specs/), and the task-level [Implementation Plan](../specs/IMPLEMENTATION_PLAN.md).
+Status as of 25 October 2026. Sources: [Protocol v1](<../specs/Protocol v1 (Training-Free).md>), [Brief](<../specs/Brief.md>), Specs 1–6 in [`specs/`](../specs/), and the task-level [Implementation Plan](../specs/IMPLEMENTATION_PLAN.md).
 
 ## Summary
 
-The code base (`code/`, package `fqsel`) is built up to milestone M3 of the Implementation Plan. That covers all of Spec 1: the item pool, verification, Q3 checks, validation negatives and Jev scoring. It also covers the shared infrastructure every later spec relies on. All 333 automated tests pass, and so do the checks on the downloaded data. Both models are chosen: OLMo 3 7B Instruct as `model.base` and Qwen3-235B-A22B-Instruct-2507 via OpenRouter as `model.strong` (see below).
+The code base (`code/`, package `fqsel`) is built through milestone M3 of the Implementation Plan and has **run all of Spec 1 on the full real data**:
+- 19,269 pool originals and 1,000 validation negatives;
+- 20,255 Q3 checks;
+- Jev scores from `jev-1.14.0`.
 
-So far the pipeline has run only with a test-only toy model and mock Jev and strong-LLM clients. **No scientific measurement has been made yet:** no experiment has run on real scores, no hypothesis has been tested and no gate has been evaluated. The current R and I values come from `MockJev` and are placeholders.
+The milestone M4 code (Spec 2, surprisal) is written and tested locally; its full run needs a GPU node. Spec 3's self-consistency comparator is implemented and running on Qwen. All 395 automated tests pass, and so do the checks on the downloaded data. Both models are chosen: OLMo 3 7B Instruct as `model.base` and Qwen3-235B-A22B-Instruct-2507 via OpenRouter as `model.strong` (see below).
+
+**The Jev battery was revised before any value measurement** (details in `notebooks/02_battery_versions_analysis.ipynb`):
+- **Primary, battery v2:** Q2 (determinacy) is asked without the stated answer.
+- **Sensitivity analysis, battery v0:** the pre-registered battery, kept and reported.
+- **Rejected, battery v1:** tested on the pilot against criteria fixed in advance.
+- **Robustness analysis, Q3-only I:** pre-specified.
+
+**No scientific measurement has been made yet** in the sense of the protocol: no experiment has run, no hypothesis has been tested and no gate has been evaluated. The full-pool R and I values are real, but the gate quantities reported below are previews computed outside Spec 3's analysis code.
 
 | Milestone | Content | Protocol v1 counterpart | Status |
 | --- | --- | --- | --- |
 | M0 | Repository, configs, CLI, DVC, CI, guard-rail tests | — | Done |
-| M1 | Shared helpers: IDs and seeds, schemas, answer matching, prompts, gates file, verdicts, clients, model backends | Setup | Done (real Jev and strong-LLM clients blocked, see Blockers) |
-| M2 | Pool, verification, Q3 checks, negatives, CSV annotation | E0 inputs; Jev battery construction | Done on the tiny profile; human validation pending |
-| M3 | Jev battery scoring → R, I, V, indecision | Constructs R and I | Done against `MockJev`; real run blocked |
-| M4 | Base-model surprisal and accuracy | Construct S | Not started |
-| M5 | Comparators, E0 analyses, gates D1–D4, analysis frame | E0, H1, D1–D4 | Not started |
+| M1 | Shared helpers: IDs and seeds, schemas, answer matching, prompts, gates file, verdicts, clients, model backends | Setup | Done; real Jev and strong-LLM clients in use (vLLM parity awaits the GPU node) |
+| M2 | Pool, verification, Q3 checks, negatives, CSV annotation | E0 inputs; Jev battery construction | Done on the full real data; human validation of the Q3 checks pending |
+| M3 | Jev battery scoring → R, I, V, indecision | Constructs R and I | Done on the full pool: battery v2 (primary) and v0 (sensitivity); pilot also under v1 |
+| M4 | Base-model surprisal and accuracy | Construct S | Code and tests done (toy model); full run waits for a GPU node |
+| M5 | Comparators, E0 analyses, gates D1–D4, analysis frame | E0, H1, D1–D4 | Self-consistency implemented and running; the rest not started |
 | M6 | Proxies G and C | Value proxies | Not started |
 | M7 | E1-G, E1-C, E2, H6, gates D5–D6 | E1, E2, H2–H4, H6, D5–D6 | Not started |
 | M8 | Variants, manipulation check, paired tests | E3, H5 | Not started (stage exists as a placeholder) |
@@ -107,20 +118,20 @@ The 512-token limit matches Spec 2's `reason` format. The pinned endpoint (`deep
 
 | Spec | Protocol v1 step | What is implemented | What remains |
 | --- | --- | --- | --- |
-| [Spec 1 — Pool and Jev scoring](<../specs/Spec 1 — Pool Construction and Jev Scoring.md>) | Constructs R and I; verified correctness for E0 and E3 | All five stages' logic: loaders for FinQA, TAT-QA and FinanceBench; exclusions; exact and MinHash deduplication; stratified probe, fixed-demo and test splits; FinQA executor (port of the official one); TAT-QA evaluator; Q3 templates plus LLM fallback; 1,000 `#neg` validation negatives; six-question Jev battery sent as one batched request per item (pinned model `jev-1.14.0`), with determinism and batching checks and per-request token tracking; R, I, V, indecision. 15 of 18 acceptance items fully automated | Human validation of Q3 checks (100 LLM checks; 50 per template); running the real Jev client (response field names and auth header from TypeSafe's API reference); full-size pool build (now possible with the OLMo 3 tokenizer) |
-| [Spec 2 — Surprisal](<../specs/Spec 2 — Base-Model Surprisal.md>) | Construct S; base-model accuracy | Prerequisites: `build_messages` with the `direct` and `reason` formats, `extract_answer`, `answers_match`, the HF and vLLM backends with token log-probabilities, and `model.base` pinned to OLMo 3 7B Instruct with its chat template checked (S2-09) | `answer_nll`, sampling, S percentile (M4) |
-| [Spec 3 — Validity and gates](<../specs/Spec 3 — Validity Checks and Gates (E0).md>) | E0; H1; gates D1–D4 | Infrastructure: `results/gates.json` schema with locked, validated writes; start-up halt check on gated stages; the verdict recorder for `hypotheses.csv`; CSV annotation module reused by the 150-item audit | Comparators, analyses A1–A6, gate logic, analysis frame (M5) |
-| [Spec 4 — Proxies G and C](<../specs/Spec 4 — Value Proxies G and C.md>) | Value proxies G and C | Prompt assembler and backends that C will use; LoRA and projection settings entered in config (seeds are placeholders) | `compute_influence`, `run_condition` (M6) |
+| [Spec 1 — Pool and Jev scoring](<../specs/Spec 1 — Pool Construction and Jev Scoring.md>) | Constructs R and I; verified correctness for E0 and E3 | All five stages' logic: loaders for FinQA, TAT-QA and FinanceBench; exclusions; exact and MinHash deduplication; stratified probe, fixed-demo and test splits; FinQA executor (port of the official one); TAT-QA evaluator; Q3 templates plus LLM fallback; 1,000 `#neg` validation negatives; six-question Jev battery, versioned (v0, v1, v2; v2 asks Q2 in a second request without the stated answer), pinned model `jev-1.14.0`, with determinism and batching checks and per-request token tracking; R, I, V, indecision. **Run on the full pool** (v2 primary, v0 sensitivity). 15 of 18 acceptance items fully automated | Human validation of Q3 checks (100 LLM checks; 50 per template); the sheets need re-exporting from the full pool |
+| [Spec 2 — Surprisal](<../specs/Spec 2 — Base-Model Surprisal.md>) | Construct S; base-model accuracy | `answer_nll` (span boundary after "Answer:", 0 of 20 hand-picked answers adjusted with the OLMo 3 tokenizer), the `surprisal` stage (NLL, 5 `reason` samples, acc, modal answer, within-dataset S) and its tests; vLLM-vs-fp32 cross-check written as a GPU test. **The full run waits for a GPU node** | — |
+| [Spec 3 — Validity and gates](<../specs/Spec 3 — Validity Checks and Gates (E0).md>) | E0; H1; gates D1–D4 | Infrastructure: `results/gates.json` schema with locked, validated writes; start-up halt check on gated stages; the verdict recorder for `hypotheses.csv`; CSV annotation module reused by the 150-item audit. **Self-consistency comparator implemented and running** (3,000 items × 5 samples). A3b (I under v0 and Q3-only) specified | `pvi`, `icl_reducible`, `ifd` (GPU), `judge_quality` (needs P3), analyses A1–A6, gate logic, analysis frame (M5) |
+| [Spec 4 — Proxies G and C](<../specs/Spec 4 — Value Proxies G and C.md>) | Value proxies G and C | Prompt assembler and backends that C will use; LoRA and projection settings entered in config, with seeds decided (P1) | `compute_influence`, `run_condition` (M6) |
 | [Spec 5 — Main tests](<../specs/Spec 5 — Main Hypothesis Tests (E1, E2).md>) | E1, E2; H2, H3, H4, H6; gates D5, D6 | Verdict recorder; gated stages `e1`/`e2` registered with the halt check | Conditions, regressions, fixed-effects logit, bootstrap, figures (M7) |
 | [Spec 6 — E3](<../specs/Spec 6 — Reliability Gate and Causal Manipulation (E3).md>) | E3; H5 | `make_wrong_answer` and `generate_check(answer=…)` shared with Spec 1, as Spec 6 requires; `e3` stage registered with both halt checks (D5 override honoured) | Variants, manipulation check, paired tests (M8) |
 
-Every acceptance item in the six specs has an ID and a status in [`code/tests/ACCEPTANCE.md`](../code/tests/ACCEPTANCE.md): 17 implemented, 7 partial, 51 pending (75 in total).
+Every acceptance item in the six specs has an ID and a status in [`code/tests/ACCEPTANCE.md`](../code/tests/ACCEPTANCE.md): 18 implemented, 14 partial, 43 pending (75 in total).
 
 ## Experiments E0–E3
 
 | Experiment | Protocol v1 | Spec | Done so far | Status |
 | --- | --- | --- | --- | --- |
-| E0, measurement validity | AUROC of R vs verified correctness; ρ of I and R with base-model accuracy; battery agreement; self-consistency; 150-item audit; PVI and ICL-reducible comparators | 3 (inputs from 1, 2) | Verified correctness (execution); the 1,000 constructed negatives that make the AUROC computable; both batteries scored (mock); CSV workflow for the audit | Inputs partly ready; analysis not built |
+| E0, measurement validity | AUROC of R vs verified correctness; ρ of I and R with base-model accuracy; battery agreement; self-consistency; 150-item audit; PVI and ICL-reducible comparators | 3 (inputs from 1, 2) | Verified correctness (execution); the 1,000 constructed negatives; real R and I on the full pool under v2 and v0 (plus Q3-only I); self-consistency running; CSV workflow for the audit | Jev inputs ready; surprisal and comparators pending; analysis not built |
 | E1-G, influence regression | G ~ I + S + I×S + R + acc + dataset | 5 (G from 4) | None beyond shared helpers | Not started |
 | E1-C, demonstration conditions | Random, top-R, top-V, top-I residualised, LLM-judge, IFD, four I×S cells | 5 (C from 4) | Fixed demonstrations (4 per dataset) and test sets (500 per dataset + FinanceBench) are sampled by the pool stage | Not started |
 | E2, dose-response | Five I quintiles under G and C | 5 | None | Not started |
@@ -132,7 +143,7 @@ No hypothesis has a verdict yet. `results/hypotheses.csv` does not exist, and ve
 
 | Hypothesis | Protocol v1 support criterion | Experiment | Inputs implemented | Verdict |
 | --- | --- | --- | --- | --- |
-| H1, Jev scores valid and new | AUROC(R) ≥ 0.70; ρ(I, acc) < 0.5; ρ(I, PVI) < 0.8; ρ(I, ICL-reducible) < 0.8 | E0 | R, I (mock), verification, negatives | Not tested |
+| H1, Jev scores valid and new | AUROC(R) ≥ 0.70; ρ(I, acc) < 0.5; ρ(I, PVI) < 0.8; ρ(I, ICL-reducible) < 0.8 | E0 | R, I (real, v2 / v0 / Q3-only), verification, negatives | Not tested |
 | H2, high-I beats random after difficulty control | Residualised I beats random under G and C, and beats the LLM-judge baseline | E1 | — | Not tested |
 | H3, value rises with I | Positive trend across I quintiles under both proxies | E2 | — | Not tested |
 | H4, I moderates S (central claim) | Sign-flipping I × S interaction under G; matching cell ordering under C | E1-G, E1-C | — | Not tested |
@@ -141,7 +152,7 @@ No hypothesis has a verdict yet. `results/hypotheses.csv` does not exist, and ve
 
 ## Gates D1–D6
 
-**None of the six gates has been evaluated.** Gate evaluation needs real Jev scores (D1–D4), surprisal and comparators (D2, D4), and proxy results (D5, D6), none of which exist yet. The mechanism the gates rely on is in place and tested:
+**None of the six gates has been evaluated.** Gate evaluation needs Spec 3's analysis code, surprisal and comparators (D2, D4), and proxy results (D5, D6). Real Jev scores now exist, so the D1 and D3 quantities can be previewed (below). The mechanism the gates rely on is in place and tested:
 - **The gates file:** `results/gates.json` follows the Spec 3 schema, and every write is locked and schema-validated.
 - **Halt checks:** every gated stage (`icl`, `e1`, `e2`, `e3`) exits at start-up when `derived.halt` is true. `e3` also exits when D5 has fired and no override reason is set.
 
@@ -153,6 +164,11 @@ No hypothesis has a verdict yet. `results/hypotheses.csv` does not exist, and ve
 | D4, cell sizes | Any I × S cell with R ≥ 0.9 below 200 items → relax to R ≥ 0.8 | Any dataset × cell below 100 → relax to 0.8; if still short, drop the R filter | After E0 (M5) | Not evaluated |
 | D5, core claim | No positive residualised-I association and no sign flip → report E0 as a measurement paper | Same, under G only; sets `halt_spec6` unless overridden with a reason | After E1-G (M7) | Not evaluated |
 | D6, proxy agreement | Ranking ρ < 0.3 → report both proxies; no single-proxy claim | Same; sets `single_proxy_claims = false` | After H6 (M7) | Not evaluated |
+
+**Previews from the full Jev run** (computed in the notebooks, not by Spec 3's code; not gate results):
+- **D1:** AUROC of R on the 995 original/negative pairs is 0.94 overall and 0.90 on arithmetic items, far above 0.70, and identical under v0 and v2.
+- **D3:** ρ(R, I) is 0.46 under v2 (FinQA 0.52, TAT-QA 0.36) and 0.18 for Q3-only I. Under the pre-registered v0 it is 0.67 overall but 0.80 on FinQA. That coupling, traced to Q2 reading the stated answer, is why the battery was revised.
+- **D4 outlook:** 77% of originals have R ≥ 0.9 (FinQA 59%, TAT-QA 86%), so the cells should be large.
 
 **Early signals worth watching.** These are not gate results.
 - **D1:** execution verifies every FinQA train item and 99.3% of TAT-QA arithmetic items. Any arithmetic reliability signal will therefore come from the constructed negatives, as Spec 1 anticipates.
@@ -168,6 +184,9 @@ No hypothesis has a verdict yet. `results/hypotheses.csv` does not exist, and ve
 | TAT-QA verification on train: arithmetic (≥ 97%), spans (≥ 99%), counts | 99.33%, 99.99%, 100% |
 | No pool item reaches Jaccard 0.9 with a probe or test item | Confirmed with an exact check, independent of MinHash, on the tiny real-data build |
 | `pool.parquet` rebuilds byte for byte from raw files | Confirmed |
+| Full pool build | 19,269 originals, 1,000 negatives; 245 exclusions; 0 leakage removals; every original verifies |
+| Full Jev runs (v0, v2) | Every response reports `jev-1.14.0`; determinism 0.012 (≤ 0.017, single scoring); batching 0.012 (≤ 0.022, batched); invariants pass |
+| `answer_nll` span with the OLMo 3 tokenizer | 20 of 20 hand-picked answers span-exact, 0 boundary adjustments |
 
 ## Changes relative to Protocol v1 made during implementation
 
@@ -177,6 +196,9 @@ None of these alters a pre-registered threshold or hypothesis rule. All are owne
 - **Base model:** OLMo 3 7B Instruct, chosen for its auditable training data (see Base model above). The protocol leaves the checkpoint open; this fills it.
 - **Strong model:** Qwen3-235B-A22B-Instruct-2507 via OpenRouter with a pinned provider, where the protocol says "frontier API with structured output". An open-weight model was chosen so that the specs' temperatures and seeds work as written (see Strong model above).
 - **Jev cost:** each item is scored in one batched request carrying all six questions, so the state is billed once instead of six times. A 200-item check against single-question requests guards against any coupling, and `jev.model` is pinned to `jev-1.14.0`. This is a Spec 1 change; the battery wording and aggregation are unchanged.
+- **Jev battery v2:** the protocol froze the v0 wording before any value measurement. v0's Q2 coupled R and I (ρ(Q1, Q2) = 0.82; FinQA ρ(R, I) = 0.80), so, under D3's own remedy and before any G or C measurement, Q2 is asked without the stated answer (v2). v2 missed one pre-set criterion on the pilot (C2: 0.58 > 0.50; 0.48 on the full pool), a disclosed exception. v0 is the pre-registered sensitivity analysis and Q3-only I a pre-specified robustness analysis.
+- **Determinism tolerance:** 0.017 instead of 0.01, set after the pilot showed a repeat difference of 0.016; to be disclosed as pilot-informed.
+- **Answer span (Spec 2):** the boundary sits after "Answer:", so the answer's first token includes the leading space that BPE tokenizers attach.
 - **Statistics:** Python only. The protocol's lme4 mixed models become the Spec 5 fixed-effects logit with a cluster bootstrap.
 - **Values the specs left blank, now decided:**
   - multiply-template rule (P2);
@@ -194,7 +216,19 @@ None of these alters a pre-registered threshold or hypothesis rule. All are owne
 ## Blockers and next steps
 
 **Blockers:**
-- ~~From TypeSafe's API reference: the response fields and the authentication header.~~ *Resolved 2026-10-24* from https://docs.typesafe.ai/api/system-one and live responses: `Authorization: Bearer <key>`; answers in `answers.<qid>.noul` (P(yes), rounded to 0.01); reported model in `model`; request ID in the `x-typesafe-request-id` response header. `GET /v1/models` lists only the aliases `jev-latest` and `jev-preview`, both resolving to `jev-1.14.0`; the versioned ID `jev-1.14.0` is served and reported back when requested, and the study pins it. Still to ask TypeSafe: whether the ~260-token overhead is billed as measured, and how long `jev-1.14.0` stays available.
-- Two annotators for the Q3 validation rounds.
+- **GPU node access:** needed for Spec 2's full run and Specs 4 and 6 (vLLM, bf16).
+- **Q3 human validation:**
+  - two annotators;
+  - re-exported sheets from the full pool. The pilot sheet was open in a spreadsheet, so it was left untouched.
+- **P3 (judge-quality prompt):** needed for `judge_quality` in milestone 5.
+- **P8 (top-20% rounding and tie-breaking):** needed by milestone 7. It decides whole selections under Q3-only I, because all 720 FinQA top-20% slots tie at 0.99.
+- **A DVC remote:** for the archive of results and API responses.
+- **Questions for TypeSafe:**
+  - whether the ~260-token request overhead is billed;
+  - how long `jev-1.14.0` stays available;
+  - whether Jev is built on Qwen.
 
-**Next:** M4 (Spec 2, surprisal S and base-model accuracy), then M5, which produces the first scientific results: E0, the H1 verdict and gates D1–D4.
+**Next:**
+- **When self-consistency finishes:** record it.
+- **Milestone 4's full run:** on the GPU node.
+- **Then milestone 5:** the remaining comparators, E0, the H1 verdict and gates D1–D4. These are the first scientific results.

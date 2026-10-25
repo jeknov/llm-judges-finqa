@@ -19,19 +19,34 @@ This brief is the entry point for implementing the study in code. It summarizes 
 - Treat the items under "Open items" as blocking: confirm each against the real files or documentation before writing code that depends on it.
 - Build in the order under "Build order", and do not start a stage until the previous stage's acceptance tests pass on the tiny profile.
 
-## Current status (24 October 2026)
+## Current status (25 October 2026)
 
-Milestones 1–3 of the build order are done: the shared helpers, all of Spec 1 (pool, verification, Q3 checks, negatives, batched Jev scoring) and the CSV annotation workflow. 351 automated tests pass, plus checks on the downloaded data. Every spec acceptance item is tracked in `code/tests/ACCEPTANCE.md`.
+**Done**
+- **Milestones 1–3, all of Spec 1, on the full pool.** 19,269 originals (6,145 FinQA, 13,124 TAT-QA) and 1,000 negatives; 20,255 Q3 checks (12,055 template, 8,200 from Qwen; not yet human-validated); and Jev scores from `jev-1.14.0`.
+  - **Battery v2 (primary):** Q2 is asked without the stated answer.
+  - **Battery v0 (pre-registered):** kept as the sensitivity analysis.
+  - **Battery v1:** tested on the pilot and rejected.
+  - **Q3-only I:** a pre-specified robustness analysis. Every result that uses I will be reported under v2, v0 and Q3-only.
+- **Milestone 4 code (Spec 2, surprisal):** `answer_nll`, the `surprisal` stage and its tests. They run locally on the toy model; the full run needs a GPU node.
+- **Tests:** 395 pass, plus checks on the downloaded data. Every spec acceptance item is tracked in `code/tests/ACCEPTANCE.md`.
+- **Archive:** five result snapshots and every Jev and Qwen response are archived under DVC (local cache only until a remote is configured).
 
-At pilot scale, pool, verification and Q3 checks have run on real data, with real Qwen calls for the fallback checks; the Q3 validation CSVs are out to annotators. The Jev client is configured from TypeSafe's API reference and checked against live responses; the pilot Jev run is done (299 items, `jev-1.14.0`, batched; single scoring under the determinism tolerance of 0.017, raised from 0.01 after the pilot), and its analysis is in `notebooks/01_pilot_jev_analysis.ipynb`. The full Spec 1 run is done: 19,258 originals and 997 negatives scored by `jev-1.14.0` with battery **v2** (primary; Q2 asked without the stated answer), and with the pre-registered battery v0 as a sensitivity analysis (Q3 checks not yet human-validated). The data are described in `notebooks/00_data_analysis.ipynb`, and the battery decision and v0/v1/v2 comparison in `notebooks/02_battery_versions_analysis.ipynb`. **No scientific measurement exists yet:** no experiment, hypothesis verdict or gate outcome.
+**Running:** Spec 3's self-consistency comparator on Qwen (3,000 items × 5 samples; about 7 hours; about $2.50).
 
-All three models are chosen; see Models and external services.
+**Notebooks:**
+- `notebooks/00_data_analysis.ipynb`: the data, pilot versus full run.
+- `notebooks/01_pilot_jev_analysis.ipynb`: the pilot Jev run.
+- `notebooks/02_battery_versions_analysis.ipynb`: the battery decision and the v0, v1, v2 and Q3-only comparison.
+
+**No scientific measurement exists yet:** no experiment, hypothesis verdict or gate outcome.
+
+**Next:**
+- **Milestone 4's full run:** needs GPU access.
+- **Milestone 5 (Spec 3):** the remaining comparators (`pvi`, `icl_reducible`, `ifd` need the GPU; `judge_quality` needs P3), then E0, the H1 verdict and gates D1–D4. These are the first scientific results.
 
 Details and progress records live elsewhere:
 - **Progress against the protocol:** experiments, hypotheses and gates in `docs/implementation-progress.md`.
 - **Task-level plan:** in `specs/IMPLEMENTATION_PLAN.md`, with the owner decisions log and the verification log.
-
-**Next:** milestone 4 (Spec 2, surprisal and base-model accuracy), then milestone 5, which produces the first scientific results: E0, the H1 verdict and gates D1–D4.
 
 ## Research goal
 
@@ -88,7 +103,7 @@ Three models plus one non-model ground truth. Each external client sits behind a
 
 | Component | Config key | Used in | Role |
 | --- | --- | --- | --- |
-| Jev, decision-only judge (TypeSafe API), pinned to `jev-1.14.0` | `jev.*` | Specs 1, 6 | Six yes/no (noul) questions per item (Q1–Q3 and paraphrases) in one batched request → R, I, indecision; manipulation check on variants |
+| Jev, decision-only judge (TypeSafe API), pinned to `jev-1.14.0` | `jev.*` | Specs 1, 6 | Six yes/no (noul) questions per item (Q1–Q3 and paraphrases); under battery v2, Q1/Q3/Q1′/Q3′ in one request on the item with its stated answer and Q2/Q2′ in a second request without it → R, I, indecision; manipulation check on variants |
 | Base model: **OLMo 3 7B Instruct** (`allenai/Olmo-3-7B-Instruct`, revision `6e5971d9eba42665f5bd5a0fcf047f299ce1dccc`, Apache 2.0), not finance-tuned, 65,536-token context, frozen, bf16 on vLLM | `model.base` | Specs 2–6 | Answer NLL, sampled accuracy, loss-based comparators, gradients for G, generations for C |
 | Strong LLM: **Qwen3-235B-A22B-Instruct-2507** via OpenRouter, pinned to the `deepinfra/fp8` endpoint, JSON-schema output, Apache 2.0 | `model.strong` | Specs 1, 3 | Fallback Q3 checks, judge-quality scores (0–5), self-consistency on a 3,000-item subsample |
 | Small open model, about 0.5B (until chosen: a locally built, test-only toy model) | `profile=tiny` | Tests | End-to-end smoke test only |
@@ -139,17 +154,17 @@ Each subsection gives what a stage must produce and the parameters that are easi
 - **Verification.** Port the official FinQA executor; evaluate TAT-QA derivations with an AST whitelist, never `eval`. Unverified items are excluded; FinanceBench gets `verified = null`.
 - **Q3 checks.** One consequence statement per pool item, true whenever the answer is true: templates keyed on the program's final operation (subtract → direction, divide → ratio vs 1, add → total exceeds the largest addend, and so on), with a strong-LLM fallback under a JSON schema. Validated on 100 items, accepted at ≥ 90%.
 - **Negatives.** 1,000 `#neg` copies with wrong answers (×{0.5, 0.8, 1.25, 2}, sign flip, boolean flip, or span swap), with regenerated Q3 checks.
-- **Jev.** Six frozen yes/no (noul) questions per pool item and negative, sent in one batched request per item: `jev_ask(state, questions)` posts the `judge` rendering once as the state, with question IDs `q1`, `q2`, `q3`, `q1p`, `q2p`, `q3p`, to `/v1/systemone` with `jev.model` pinned to `jev-1.14.0`. Billing is per input token, so batching bills the state once instead of six times. R = P(yes | Q1); I = mean of P(yes | Q2) and P(yes | Q3); V = R × I; indecision = max binary entropy. Same for the paraphrase battery. Cache keyed on SHA-256 of (model ID, state, canonical JSON of questions); `429` retried honouring `retry-after`. A 200-item check confirms batched and single-question answers agree, otherwise every question is sent alone; `jev_requests.parquet` tracks input tokens per request.
+- **Jev.** Six frozen yes/no (noul) questions per pool item and negative, sent in one batched request per item: `jev_ask(state, questions)` posts the `judge` rendering once as the state, with question IDs `q1`, `q2`, `q3`, `q1p`, `q2p`, `q3p`, to `/v1/systemone` with `jev.model` pinned to `jev-1.14.0`. Billing is per input token, so batching bills the state once instead of six times. R = P(yes | Q1); I = mean of P(yes | Q2) and P(yes | Q3); V = R × I; indecision = max binary entropy. Same for the paraphrase battery. **Battery v2 (primary, 25 October 2026):** Q2 and Q2′ go in a second request whose state has no stated answer, shared by an original and its negative. v0 (one six-question request) is the pre-registered sensitivity analysis. See Spec 1, Battery versions. Cache keyed on SHA-256 of (model ID, state, canonical JSON of questions); `429` retried honouring `retry-after`. A 200-item check confirms batched and single-question answers agree, otherwise every question is sent alone; `jev_requests.parquet` tracks input tokens per request.
 
 ### Spec 2 — Base-model surprisal
 
-- **NLL.** `direct` format via vLLM `prompt_logprobs`, summed over the answer-token span only; `S` is the within-dataset percentile of mean NLL. Cross-check 200 items against fp32 Transformers within 0.05 nats.
+- **NLL.** `direct` format via vLLM `prompt_logprobs`, summed over the answer-token span only. The span boundary sits after `Answer:`, because BPE attaches the following space to the answer's first token. `S` is the within-dataset percentile of mean NLL. Cross-check 200 items against fp32 Transformers within 0.05 nats. Raw samples go to `scores/surprisal_samples.parquet`.
 - **Accuracy.** 5 `reason`-format samples (temperature 0.7, top-p 0.95, 512 new tokens); `acc` = share matching gold. More than 5% unparsed samples blocks the stage.
 
 ### Spec 3 — Validity checks, gates and the analysis frame
 
 - **Comparators.** `pvi` (NLL without minus with context), `icl_reducible` (zero-shot minus 4-fixed-demo NLL), `ifd` (conditioned over answer-only NLL), `judge_quality` (0–5, also on negatives), and strong-LLM self-consistency on 3,000 items (5 samples at temperature 0.7, top-p 0.8, top-k 20, 512 tokens; P5, owner decision).
-- **Analyses A1–A6.** A1: AUROC of R on originals vs negatives, by answer type, with a paired cluster bootstrap. A2: Spearman correlations among I, R, S, acc and comparators. A3: battery robustness. A4: self-consistency agreement. A5: dataset × cell counts. A6: human audit.
+- **Analyses A1–A6.** A1: AUROC of R on originals vs negatives, by answer type, with a paired cluster bootstrap. A2: Spearman correlations among I, R, S, acc and comparators. A3: battery robustness; A3b: every I-based result also under I\_v0 (battery v0) and I\_Q3 (Q3 only), with gates decided on the primary I. A4: self-consistency agreement. A5: dataset × cell counts. A6: human audit.
 - **Gates D1–D4** → `gates.json`. **Frame** → `analysis_frame.parquet`, holding `R_eff`, `V_eff`, `in_design`, `cell`, `quintile`. Downstream stages read these labels and never recompute them.
 
 ### Spec 4 — Value proxies
@@ -216,9 +231,9 @@ Each milestone ends with its tests passing on the tiny profile; full-scale runs 
 
 1. ✅ **Foundation.** Package skeleton, Hydra configs, `io.py` with pandera schemas, `ids.py`, `match.py`, `prompts.py`, the mock clients, and the CI harness with the smoke-test scaffold.
 2. ✅ **Data, Spec 1 without Jev.** Loaders for FinQA, TAT-QA and FinanceBench; dedup and leakage removal; the token budget; splits; the executor and evaluator; Q3 templates and the LLM fallback; negatives.
-3. ✅ **Jev scoring** (against `MockJev`; the real run waits for the TypeSafe items below). Batched client with caching and `retry-after` handling, the determinism and batching checks, aggregation into R and I.
-4. **Base-model scoring, Spec 2.** `answer_nll` with the span logic, sampling, extraction, the S percentile.
-5. **E0 and gates, Spec 3.** Comparators, A1–A6, gates D1–D4, the frame, the H1 verdict.
+3. ✅ **Jev scoring**, run for real on the pilot and the full pool (batteries v0 and v2). Batched client with caching and `retry-after` handling, the determinism and batching checks, aggregation into R and I.
+4. ◐ **Base-model scoring, Spec 2.** `answer_nll` with the span logic, sampling, extraction, the S percentile. *Code and tests done; the full run waits for a GPU node.*
+5. **E0 and gates, Spec 3.** Comparators, A1–A6, gates D1–D4, the frame, the H1 verdict. *Self-consistency implemented and running.*
 6. **Proxies, Spec 4.** `compute_influence` with its sanity checks, then `run_condition`, including `demo_plan`.
 7. **Analyses, Spec 5.** Condition files, E1-G with the bootstrap, E1-C, E2, H6, D5, D6, Figs. 1–3.
 8. **E3, Spec 6.** Variants, manipulation check, paired tests, Fig. 4.
@@ -235,13 +250,16 @@ The specs refine protocol v1 in documented places; the full table, with reasons,
 - Gate D4 counts per dataset × cell, against 100.
 - The mixed models add a dataset fixed effect, and nest draw in condition, except in Spec 6's paired models, where draws are crossed.
 
-**Implementation decisions.** Choices made while building milestones 1–3 are listed in the plan's owner decisions log, each with its reason. The ones most relevant here:
+**Implementation decisions.** Choices made while building milestones 1–4 are listed in the plan's owner decisions log, each with its reason. The ones most relevant here:
 - Python only;
 - human labeling through CSV files, never Argilla;
 - one batched Jev request per item;
 - case-insensitive span verification for TAT-QA;
 - accounting negatives in TAT-QA derivations;
-- templates for FinQA table-operation items.
+- templates for FinQA table-operation items;
+- Jev battery v2 as primary, with v0 as sensitivity and Q3-only I as robustness;
+- determinism tolerance 0.017 (pilot-informed);
+- Qwen calls in parallel, with retries on rate limits and dropped connections.
 
 **Open items, blocking: confirm before coding the dependent stage.**
 
@@ -255,8 +273,11 @@ The specs refine protocol v1 in documented places; the full table, with reasons,
 - [ ] Whether the GPU budget allows CBI sampling on 10 draws, or only 5 (Spec 4).
 - [ ] Values the specs leave blank, still to decide:
   - judge-quality prompt wording (P3, milestone 5);
-  - top-20% rounding and tie-breaking (P8, milestone 7).
+  - top-20% rounding and tie-breaking (P8, milestone 7). This now decides whole selections under I\_Q3: all 720 FinQA top-20% slots tie at 0.99.
   
   Already decided: the Q3 fallback prompt (P4) and self-consistency sampling (P5).
 - [ ] The ~0.5B tiny-profile model (milestone 4).
+- [ ] GPU node access for Specs 2, 4 and 6 (vLLM, bf16, room for one 7B model at a time for the cross-check).
+- [ ] A DVC remote, so the archive of results and API responses survives off this machine.
+- [ ] Re-export the Q3 validation sheets from the full pool. The pilot sheet `annotator_1.csv` was open in a spreadsheet on 25 October, so it was left untouched.
 - [ ] Before using the strong model: ask TypeSafe whether Jev is built on a Qwen model.
