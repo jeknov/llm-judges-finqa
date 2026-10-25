@@ -7,4 +7,4 @@ lora:
   seed: 20261024                 # P1 — owner decision 2026-10-24
 projection:
   dim: 8192
-  seed: 20261024                 # P1 — owner decision 2026-10-24
+  seed: 10242026                 # P1 — owner decision 2026-10-25 (distinct from the LoRA seed)

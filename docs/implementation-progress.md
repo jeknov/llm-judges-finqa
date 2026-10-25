@@ -189,7 +189,7 @@ None of these alters a pre-registered threshold or hypothesis rule. All are owne
   - templates applying to FinQA table-operation items;
   - self-consistency sampling (P5): temperature 0.7, top-p 0.8, top-k 20;
   - Q3 LLM-fallback prompt wording (P4): drafted by Claude, approved by the owner on 24 October 2026 and frozen (`code/prompts/q3_fallback.txt`).
-- **Still open:** judge-quality prompt (P3) and top-20% rounding (P8). LoRA and projection seeds (P1) were set to 20261024 on 24 October.
+- **Still open:** judge-quality prompt (P3) and top-20% rounding (P8). LoRA and projection seeds (P1) are set: LoRA 20261024, projection 10242026.
 
 ## Blockers and next steps
 
