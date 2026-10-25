@@ -102,16 +102,41 @@ def test_extract_answer_fallback_only_looks_at_last_200_chars():
     assert extract_answer(text, "arith") is None
 
 
-def test_jev_battery_matches_spec1_wording():
-    battery = yaml.safe_load((PROMPTS_DIR / "jev_battery.yaml").read_text())
+V0_Q2 = {"orig": "Do the context and question determine this answer uniquely, such that no materially different answer would also be defensible?",
+         "para": "Is this the only reasonable answer to the question given the information, rather than one of several defensible answers?"}
+
+
+V1_Q2 = {"orig": "Assume the stated answer is correct. Is the question, read against the context, specific enough that no materially different answer could also be correct?",
+         "para": "Suppose the answer given is right. Does the information pin the question down so that only one answer, and no materially different one, could be right?"}
+
+
+def test_jev_battery_v1_is_kept_unchanged():
+    """v1 (rejected on its pilot criteria, 2026-10-25) stays on disk word for word, for the paper."""
+    v1 = yaml.safe_load((PROMPTS_DIR / "jev_battery_v1.yaml").read_text())
+    assert v1["orig"]["q2"] == V1_Q2["orig"] and v1["para"]["q2"] == V1_Q2["para"]
+    assert "answer_free" not in v1
+
+
+def test_jev_battery_v0_is_kept_unchanged():
+    """v0 (pilot and first full run) stays on disk word for word, for the paper."""
+    v0 = yaml.safe_load((PROMPTS_DIR / "jev_battery_v0.yaml").read_text())
+    assert v0["orig"]["q2"] == V0_Q2["orig"] and v0["para"]["q2"] == V0_Q2["para"]
+    v1 = yaml.safe_load((PROMPTS_DIR / "jev_battery_v1.yaml").read_text())
+    for b in ("orig", "para"):
+        assert {q: v0[b][q] for q in ("q1", "q3")} == {q: v1[b][q] for q in ("q1", "q3")}  # only Q2 changed
+
+
+def test_jev_battery_matches_spec1_wording(cfg):
+    assert cfg.jev.battery_version == "v2"
+    battery = yaml.safe_load((PROMPTS_DIR / f"jev_battery_{cfg.jev.battery_version}.yaml").read_text())
     assert battery["orig"] == {
         "q1": "Given the context and question, is the stated answer supported by the context?",
-        "q2": "Do the context and question determine this answer uniquely, such that no materially different answer would also be defensible?",
+        "q2": "Do the context and question determine a single answer uniquely, such that no materially different answer would also be defensible?",
         "q3": "Assume the stated answer is true. Does it entail the following check? Check: {check_text}",
     }
     assert battery["para"] == {
         "q1": "Does the information provided back up the answer given to this question?",
-        "q2": "Is this the only reasonable answer to the question given the information, rather than one of several defensible answers?",
+        "q2": "Is there only one reasonable answer to this question given the information, rather than several defensible answers?",
         "q3": "If the answer given is correct, must the following statement also be correct? Statement: {check_text}",
     }
 

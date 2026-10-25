@@ -1,5 +1,5 @@
 # Spec 1, Jev battery scoring.
-battery_version: v0
+battery_version: v2             # prompts/jev_battery_<version>.yaml; v0 and v1 kept for the paper
 model: jev-1.14.0                # pinned versioned ID, never an alias (Spec 1, Client interface)
 endpoint: https://api.typesafe.ai/v1/systemone
 question_type: noul

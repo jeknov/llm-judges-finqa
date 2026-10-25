@@ -1,6 +1,8 @@
 # STATUS: FINAL
-# Spec 1, Jev battery scoring, Prompts. Frozen before any score is looked at; changing a wording
-# invalidates all scores and requires bumping jev.battery_version. Snapshot-tested.
+# Spec 1, Jev battery v0 — SUPERSEDED by v1 on 2026-10-24 (owner decision); kept unchanged for the paper.
+# v0 was used for the pilot and the first full run (outputs in runs/pilot_2026-10-24 and
+# runs/full_v0_2026-10-24). Its Q2 tracked correctness (rho(Q1, Q2) = 0.82 on the full pool), so v1
+# conditions Q2 on the stated answer being true. Do not edit; select it with jev.battery_version=v0.
 orig:
   q1: "Given the context and question, is the stated answer supported by the context?"
   q2: "Do the context and question determine this answer uniquely, such that no materially different answer would also be defensible?"

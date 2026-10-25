@@ -43,7 +43,7 @@ def test_invalid_update_is_refused_and_file_kept(cfg):
 def test_default_gates_validate(cfg):
     data = update_gates(cfg, lambda g: None)
     assert data["derived"]["r_threshold"] == 0.9 and data["gates"]["D5"] is None
-    assert json.loads(gates_path(cfg).read_text())["battery_version"] == "v0"
+    assert json.loads(gates_path(cfg).read_text())["battery_version"] == "v2"
 
 
 @pytest.mark.spec("S5-10")

@@ -36,6 +36,13 @@ Five analyses run on pool items, each writing one table to `results/e0/`. All co
 
 **A3, battery robustness.** ρ(R, R\_para) and ρ(I, I\_para), plus the intraclass correlation ICC(2,1) for each pair. Also report the share of items that change I × S cell when I\_para replaces I.
 
+**A3b, alternative definitions of I (pre-specified robustness, added 25 October 2026 before any G or C measurement).** The primary I is battery v2's mean of P(yes | Q2) and P(yes | Q3). A1's AUROC of I, every A2 pair that involves I, A3 and A5 are repeated with two alternatives:
+
+- **I\_v0:** the same mean under the pre-registered battery v0, from the full v0 run.
+- **I\_Q3:** P(yes | Q3) alone, with I\_Q3\_para = P(yes | Q3′). Q3's wording is identical in every battery version, so I\_Q3 does not depend on the battery.
+
+Gates D2–D4 are decided on the primary I only. For each alternative, report whether any gate would have reached a different decision. I\_Q3 is close to its ceiling and heavily tied (on the full pool, 61% of originals have I\_Q3 ≥ 0.95, and only 98 distinct values occur). So for A5 also report the share of items lying exactly at each dataset's I\_Q3 median, which are assigned to the high-I side as for the primary I.
+
 **A4, agreement with self-consistency.** On the 3,000-item subsample: ρ(R, sc\_acc), and the AUROC of R for predicting whether the strong LLM's modal answer matches gold.
 
 **A5, cell sizes (D4).** Count pool items in each of the four I × S cells within R ≥ 0.9, overall and per dataset. Here R means effective R after D1, with the threshold at its current value (0.9, or 0.8 after D4 fires). Medians of I and S are taken within each dataset over the same items, and are the medians stored in gates.json.

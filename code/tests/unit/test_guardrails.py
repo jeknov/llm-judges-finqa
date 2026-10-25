@@ -93,7 +93,7 @@ def test_config_is_strict(cfg):
 
 def test_tiny_profile_has_no_missing_values_it_uses(cfg):
     """Tiny runs with mocks; only values not needed by tiny (real models, later milestones) may be ???."""
-    allowed = {"proxy.lora.seed", "proxy.projection.seed", "stats.top_rounding", "stats.top_tie_break"}
+    allowed = {"stats.top_rounding", "stats.top_tie_break"}
     assert set(find_missing(cfg)) <= allowed
 
 
@@ -104,7 +104,8 @@ def test_no_placeholders_for_real_runs(profile):
     with pytest.raises(PlaceholderError) as err:
         load_config([f"profile={profile}"])
     message = str(err.value)
-    assert "proxy.lora.seed" in message and "prompts/judge_quality.txt" in message
+    assert "stats.top_rounding" in message and "prompts/judge_quality.txt" in message
+    assert "proxy.lora.seed" not in message  # P1 decided 2026-10-24
     assert "model.base" not in message  # decided 2026-10-23: OLMo 3 7B Instruct
 
 
@@ -115,7 +116,7 @@ def test_spec1_stages_ignore_only_later_decisions():
     for name in ("pool", "verify", "q3", "jev"):
         ignores = set(get_stage(name).ignores)
         assert {"proxy", "stats", "judge_quality.txt"} <= ignores
-        assert not ignores & {"data", "model", "q3_fallback.txt", "jev_battery.yaml"}
+        assert not ignores & {"data", "model", "q3_fallback.txt", "jev_battery_v0.yaml", "jev_battery_v1.yaml"}
     assert "jev" not in get_stage("jev").ignores
     assert all(not s.ignores for s in STAGES if s.spec > 1)
 
@@ -128,7 +129,7 @@ def test_jev_stage_loads_for_real_runs_but_refuses_its_own_placeholders():
         load_config(["profile=pilot", "jev.api.answers_field=???"], ignore=get_stage("jev").ignores)
     message = str(err.value)
     assert "jev.api.answers_field" in message
-    assert "proxy.lora.seed" not in message and "judge_quality.txt" not in message
+    assert "stats.top_rounding" not in message and "judge_quality.txt" not in message
 
 
 def test_ignored_value_still_fails_when_read():
@@ -140,7 +141,7 @@ def test_ignored_value_still_fails_when_read():
     cfg = load_config()
     check_real_run_ready(cfg, ignore=find_missing(cfg) + unfinished_prompts())
     with pytest.raises(MissingMandatoryValue):
-        _ = cfg.proxy.lora.seed
+        _ = cfg.stats.top_rounding
 
 
 def test_model_base_is_pinned_to_a_commit():

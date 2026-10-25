@@ -1,0 +1,13 @@
+# STATUS: FINAL
+# Spec 1, Jev battery v1 (owner decision 2026-10-24). Identical to v0 except Q2 and Q2', which now assume
+# the stated answer is correct, as Q3 does, so that determinacy is measured given the datum is true
+# (the thesis's definition of I) instead of re-checking correctness. Frozen: changing a wording
+# invalidates all scores and requires bumping jev.battery_version. Snapshot-tested.
+orig:
+  q1: "Given the context and question, is the stated answer supported by the context?"
+  q2: "Assume the stated answer is correct. Is the question, read against the context, specific enough that no materially different answer could also be correct?"
+  q3: "Assume the stated answer is true. Does it entail the following check? Check: {check_text}"
+para:
+  q1: "Does the information provided back up the answer given to this question?"
+  q2: "Suppose the answer given is right. Does the information pin the question down so that only one answer, and no materially different one, could be right?"
+  q3: "If the answer given is correct, must the following statement also be correct? Statement: {check_text}"

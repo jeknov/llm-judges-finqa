@@ -59,7 +59,9 @@ def scored(tmp_path_factory, synth_raw):
     from fqsel.config import load_config
 
     root = tmp_path_factory.mktemp("jev_run")
-    cfg = load_config([f"paths.root={root}", f"paths.raw={synth_raw}", f"paths.cache={root / 'cache'}"])
+    # battery v0: one state, one six-question request per item (v0 and v1 share this path; v2 is tested below)
+    cfg = load_config([f"paths.root={root}", f"paths.raw={synth_raw}", f"paths.cache={root / 'cache'}",
+                       "jev.battery_version=v0"])
     for stage in ("pool", "q3"):
         run_stage(stage, cfg)
     backend = MockJev()
@@ -111,7 +113,7 @@ def test_answers_map_to_the_right_question_ids(scored):
     cfg, _, backend = scored
     pool = read_table("pool", cfg).set_index("item_id")
     checks = read_table("q3_checks", cfg).set_index("item_id")["check_text"]
-    battery = load_battery()
+    battery = load_battery(cfg.jev.battery_version)
     long = read_table("jev_scores_long", cfg)
     for _, row in long.iterrows():
         state = render_item(pool.loc[row["item_id"]].to_dict(), "judge")
@@ -126,7 +128,7 @@ def test_state_is_judge_rendering_and_q3_carries_the_check(scored):
     neg_id = next(i for i in pool.index if i.endswith("#neg"))
     state = render_item(pool.loc[neg_id].to_dict(), "judge")
     assert state.endswith(f"Stated answer: {pool.loc[neg_id, 'gold_answer']}")
-    qs = build_questions(load_battery(), checks[neg_id])
+    qs = build_questions(load_battery(cfg.jev.battery_version), checks[neg_id])
     assert set(qs) == {"q1", "q2", "q3", "q1p", "q2p", "q3p"}
     assert qs["q3"].endswith(f"Check: {checks[neg_id]}") and qs["q3p"].endswith(f"Statement: {checks[neg_id]}")
 
@@ -170,7 +172,7 @@ def test_batched_requests_cost_less_than_single_question_requests(scored, tmp_pa
 def _states_and_questions(cfg):
     pool = read_table("pool", cfg).set_index("item_id")
     checks = read_table("q3_checks", cfg).set_index("item_id")["check_text"]
-    battery = load_battery()
+    battery = load_battery(cfg.jev.battery_version)
     return [(render_item(pool.loc[i].to_dict(), "judge"), build_questions(battery, checks[i])) for i in checks.index]
 
 
@@ -227,3 +229,68 @@ def test_determinism_check_triggers_triplicate(scored, tmp_path):
     assert run_checks(cfg) == []
     jev_stage.run(cfg, client=JevClient(NoisyJev(0.004), JsonCache(tmp_path / "quiet")))
     assert (read_table("jev_scores_long", cfg)["n_calls"] == 1).all()
+
+
+@pytest.fixture(scope="module")
+def scored_v2(tmp_path_factory, synth_raw):
+    from fqsel.config import load_config
+
+    root = tmp_path_factory.mktemp("jev_v2")
+    cfg = load_config([f"paths.root={root}", f"paths.raw={synth_raw}", f"paths.cache={root / 'cache'}"])
+    assert cfg.jev.battery_version == "v2"
+    for stage in ("pool", "q3"):
+        run_stage(stage, cfg)
+    backend = MockJev()
+    client = JevClient(backend, JsonCache(root / "jevcache"))
+    jev_stage.run(cfg, client=client)
+    return cfg, client, backend
+
+
+def test_v2_answer_free_questions_never_see_the_stated_answer(scored_v2):
+    """Battery v2: Q2 and Q2' are answered against the qa rendering (no stated answer); the rest against
+    the judge rendering. Each stored P(yes) matches its own state and wording."""
+    cfg, _, backend = scored_v2
+    pool = read_table("pool", cfg).set_index("item_id")
+    checks = read_table("q3_checks", cfg).set_index("item_id")["check_text"]
+    battery = load_battery("v2")
+    assert battery["answer_free"] == ["q2"]
+    long = read_table("jev_scores_long", cfg)
+    for _, row in long.iterrows():
+        kind = "qa" if row["question"] == "q2" else "judge"
+        state = render_item(pool.loc[row["item_id"]].to_dict(), kind)
+        assert ("Stated answer:" in state) == (kind == "judge")
+        text = build_questions(battery, checks[row["item_id"]])[QIDS[(row["battery"], row["question"])]]
+        assert row["p_yes"] == pytest.approx(backend.answer(state, text))
+    for qs in backend.requests:   # batched or single-question, a request never mixes the two states
+        assert set(qs) <= {"q2", "q2p"} or set(qs) <= {"q1", "q3", "q1p", "q3p"}
+
+
+def test_v2_original_and_negative_share_q2_and_it_is_sent_once(scored_v2):
+    cfg, _, backend = scored_v2
+    long = read_table("jev_scores_long", cfg)
+    pool = read_table("pool", cfg).set_index("item_id")
+    q2 = long[long["question"] == "q2"].set_index(["item_id", "battery"])["p_yes"]
+    negs = [i for i in pool.index if i.endswith("#neg") and i in set(long["item_id"])]
+    assert negs
+    for n in negs:
+        base = pool.loc[n, "base_item_id"]
+        for b in ("orig", "para"):
+            assert q2[(n, b)] == q2[(base, b)]          # determinacy cannot differ: the answer is not shown
+    sent_qa = [qs for qs in backend.requests if set(qs) == {"q2", "q2p"}]
+    # one round of scoring plus the preflight's two batched rounds on the sample, each deduplicated
+    states = {render_item(pool.loc[i].to_dict(), "qa") for i in long["item_id"].unique()}
+    assert len(sent_qa) <= 3 * len(states)
+    assert run_checks(cfg) == []
+    m = _manifest(cfg)
+    assert m["battery_version"] == "v2"
+
+
+def test_v2_wording_differs_from_v0_only_in_q2():
+    v0 = load_battery("v0")
+    v2 = load_battery("v2")
+    for b in ("orig", "para"):
+        assert {q: v0[b][q] for q in ("q1", "q3")} == {q: v2[b][q] for q in ("q1", "q3")}
+    assert v2["orig"]["q2"] == ("Do the context and question determine a single answer uniquely, such that no "
+                                "materially different answer would also be defensible?")
+    assert v2["para"]["q2"] == ("Is there only one reasonable answer to this question given the information, "
+                                "rather than several defensible answers?")

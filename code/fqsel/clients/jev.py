@@ -12,6 +12,7 @@ calls are really re-sent. 429 responses are retried with exponential backoff hon
 
 from __future__ import annotations
 
+import http.client
 import json
 import os
 import re
@@ -129,7 +130,8 @@ class RealJev:
             if e.code >= 500:
                 raise TransientError(f"HTTP {e.code}") from e
             raise
-        except (urllib.error.URLError, TimeoutError) as e:
+        except (urllib.error.URLError, TimeoutError, ConnectionError, http.client.HTTPException) as e:
+            # includes a connection dropped mid-response (http.client.IncompleteRead)
             raise TransientError(str(e)) from e
         answers = data[self.api.answers_field]
         probs = {qid: float(answers[qid][self.api.probability_field]) for qid in questions}

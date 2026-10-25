@@ -433,13 +433,13 @@ The `e3` stage exists as a placeholder from M0 and is filled in here.
 1. Model choices: ~~`model.base`~~ resolved 2026-10-23: OLMo 3 7B Instruct at revision `6e5971d9eba42665f5bd5a0fcf047f299ce1dccc`. `model.strong` resolved 2026-10-24: Qwen3-235B-A22B-Instruct-2507 via OpenRouter, pinned to `deepinfra/fp8`. Still open: the ~0.5B tiny-profile model (M4).
 2. ~~From TypeSafe's API reference: the response fields and the authentication header (`jev.api.*`).~~ *Resolved 2026-10-24* from https://docs.typesafe.ai/api/system-one and live responses: `Authorization: Bearer <key>`; answers in `answers.<qid>.noul` (P(yes), rounded to 0.01); reported model in `model`; request ID in the `x-typesafe-request-id` response header. `GET /v1/models` lists only the aliases `jev-latest` and `jev-preview`, both resolving to `jev-1.14.0`; the versioned ID `jev-1.14.0` is served and reported back when requested, and the study pins it. Still open: whether the ~260-token per-request overhead is billed as measured, and how long the versioned ID `jev-1.14.0` stays available. *(real `jev` run)*
 3. ~~Raw data field names; TAT-QA test gold availability~~ — resolved 2026-10-23: confirmed against the downloaded files; TAT-QA test gold is public.
-4. **Q2 coupling with Q1 (from the pilot Jev analysis, 2026-10-24).** On the pilot, ρ(Q1, Q2) = 0.87 on originals and Q2 separates wrong answers almost as well as Q1 (AUROC 0.90 vs 0.95), so I = mean(Q2, Q3) carries a correctness component; ρ(R, I) = 0.73 [0.65, 0.79] on the current single-call pilot scores (0.74 [0.67, 0.80] on the earlier triplicate means) (D3 threshold 0.8; the FinQA interval crosses it). Options: keep the pre-registered I and add Q2/Q3-separate robustness analyses in Spec 3, or revise Q2 (battery change: bump `battery_version`, re-score). *(before the full `jev` run)*
+4. ~~**Q2 coupling with Q1**~~ — **decided 2026-10-24: revise Q2 and Q2′ (battery v1)**; acceptance criteria below, fixed before any v1 score. Original text: **Q2 coupling with Q1 (from the pilot Jev analysis, 2026-10-24).** On the pilot, ρ(Q1, Q2) = 0.87 on originals and Q2 separates wrong answers almost as well as Q1 (AUROC 0.90 vs 0.95), so I = mean(Q2, Q3) carries a correctness component; ρ(R, I) = 0.73 [0.65, 0.79] on the current single-call pilot scores (0.74 [0.67, 0.80] on the earlier triplicate means) (D3 threshold 0.8; the FinQA interval crosses it). Options: keep the pre-registered I and add Q2/Q3-separate robustness analyses in Spec 3, or revise Q2 (battery change: bump `battery_version`, re-score). *(before the full `jev` run)*
 
 **Placeholders: values the specs leave blank** (kept as `???` until the owner decides)
 
 | # | Placeholder | Location | Status |
 | --- | --- | --- | --- |
-| P1 | LoRA init seed, projection seed (my proposal: `stable_seed(20261022, "lora")` / `"proj"`) | `conf/proxy/influence.yaml` | open — asked at M6 |
+| P1 | LoRA init seed, projection seed | `conf/proxy/influence.yaml` | **resolved 2026-10-24**: both 20261024 (owner) |
 | P2 | Truth condition for the `multiply` Q3 template | `fqsel/checks.py` | **resolved**: \|second factor\| vs 1; = 1 or a zero factor → LLM fallback |
 | P3 | Wording of the judge-quality prompt | `prompts/judge_quality.txt` | open — asked at M5 |
 | P4 | Wording of the Q3 LLM-fallback prompt | `prompts/q3_fallback.txt` | **resolved**: Claude's draft approved by the owner on 2026-10-24; file marked `STATUS: FINAL` and frozen |
@@ -474,6 +474,41 @@ The `e3` stage exists as a placeholder from M0 and is filled in here.
 
 ---
 
+
+### Battery v1 acceptance criteria (recorded 2026-10-25 00:11 UTC, before any v1 score)
+
+Battery v1 changes only Q2 and Q2′ (`prompts/jev_battery_v1.yaml`). It is tested on the pilot sample first: the same 200 originals and 99 pairs as the v0 pilot, scored into `code/runs/pilot_v1_2026-10-24/`, so no v0 output is overwritten. v1 is accepted, and the full pool re-scored with it, only if **all four** criteria hold on the pilot:
+
+| # | Criterion | Threshold | v0 pilot value |
+|---|---|---|---|
+| C1 | AUROC of Q2 P(yes), originals vs their negatives (99 pairs) — correctness leakage | ≤ 0.75 | 0.901 |
+| C2 | Spearman ρ(Q1, Q2) on the 200 originals — coupling with support | ≤ 0.50 | 0.874 |
+| C3 | Spread of Q2 on originals: SD ≥ 0.10 and at most 20% of items with P(yes) ≥ 0.99 | both | SD 0.22; 0% |
+| C4 | Spearman ρ(Q2, Q2′) on the 200 originals — paraphrase agreement | ≥ 0.70 | 0.95 |
+
+v0 reference values computed from `code/runs/pilot_2026-10-24/` (single-call scores; thresholds unchanged when the reference column was corrected, still before any v1 score).
+
+If any criterion fails, the full pool is **not** re-scored, the wording is **not** tuned against the data, and the owner decides between keeping v0 and the fallback: scoring Q2 on a state without the stated answer. The v0 outputs are kept in `code/runs/pilot_2026-10-24/` and `code/runs/full_v0_2026-10-24/` (with SHA256SUMS), and the v0 wording in `prompts/jev_battery_v0.yaml`.
+
+**Outcome (2026-10-25): v1 rejected — fails C1 and C2.** Pilot v1 values: C1 0.849 (> 0.75), C2 0.748 (> 0.50), C3 SD 0.20 and 0% ≥ 0.99 (pass), C4 0.951 (pass). For context: ρ(R, I) 0.655 (v0 0.726), median Q2 on originals 0.77 (v0 0.87), AUROC of R unchanged (0.949), and Q2′ AUROC on negatives unchanged (0.896). Conditioning on truth weakens the coupling but does not remove it. Per the rule above, the full pool was not re-scored and the wording was not tuned. v1 outputs are kept in `code/runs/pilot_v1_2026-10-24/`. The owner decides: keep v0, or the fallback of scoring Q2 on a state without the stated answer.
+
+### Battery v2 acceptance criteria (recorded 2026-10-25 00:26 UTC, before any v2 score)
+
+Owner decision 2026-10-25: the fallback. In battery v2 (`prompts/jev_battery_v2.yaml`), Q2 and Q2′ are sent in a second request whose state has only the context and question, with no stated answer. Their wording is v0's, with "this answer" changed to "a single answer". Q1, Q3, Q1′ and Q3′ keep v0's wording and state.
+
+v2 is tested on the same pilot sample, scored into `code/runs/pilot_v2_2026-10-25/`. It is accepted, and the full pool re-scored, only if all of the following hold:
+
+| # | Criterion | Threshold |
+|---|---|---|
+| C1′ | Construction check: Q2 and Q2′ identical for every original and its negative. This replaces C1, which is uninformative under v2 because it equals 0.5 by construction | exact equality for all pairs |
+| C2 | Spearman ρ(Q1, Q2) on the 200 originals | ≤ 0.50 |
+| C3 | Spread of Q2 on originals: SD ≥ 0.10 and at most 20% with P(yes) ≥ 0.99 | both |
+| C4 | Spearman ρ(Q2, Q2′) on the 200 originals | ≥ 0.70 |
+
+Reported but not criteria: ρ(R, I), the AUROC of R and of I on the 99 pairs, ρ(Q2, Q3), and the median Q2. If any criterion fails, nothing is re-scored or tuned, and the owner decides. All v0 and v1 wording and outputs are kept: `prompts/jev_battery_v0.yaml`, `prompts/jev_battery_v1.yaml`, `code/runs/pilot_2026-10-24/`, `code/runs/full_v0_2026-10-24/` and `code/runs/pilot_v1_2026-10-24/`.
+
+**Outcome (2026-10-25): v2 does not meet all criteria — fails C2.** Pilot v2 values: C1′ holds (Q2 and Q2′ identical for all 99 pairs); C2 ρ(Q1, Q2) = 0.582 (> 0.50); C3 SD 0.20 and 0% ≥ 0.99 (pass); C4 0.965 (pass). Reported values: ρ(R, I) 0.530 (v0 0.726, v1 0.655), FinQA 0.460 (v0 0.762), TAT-QA 0.448; AUROC of R 0.948 (unchanged); AUROC of I 0.685 (v0 0.906); ρ(Q2, Q3) 0.086. Because Q2 cannot see the stated answer under v2, the remaining ρ(Q1, Q2) = 0.58 is not answer leakage. It is item-level covariance: questions that are less determinate tend to have less-supported gold answers. Per the rule, nothing was re-scored or tuned; the owner decides. Outputs are in `code/runs/pilot_v2_2026-10-25/`.
+
 ## Verification log
 
 Real-data, GPU, API and human checks, recorded as they are run. One row per check; never overwrite a row: add a new one when rerun.
@@ -505,6 +540,15 @@ Real-data, GPU, API and human checks, recorded as they are run. One row per chec
 | 2026-10-24 | 03e8a0b+ | Correction to the pilot Jev rows above | pilot | requests actually sent: 2,097 (1,200 single-question + 897 batched), 2.51M input tokens, from `.cache/logs/jev_calls.jsonl`; the scoring run reused the preflight's 400 cached batched responses, which the manifest's `full_run` counts include. Informal AUROC row: 200 originals vs 99 negatives (not 199 vs 100), unpaired | — | the corrected figures are in the notebook |
 | 2026-10-24 | 03e8a0b+ | Pilot Jev analysis (`notebooks/pilot_jev_analysis.ipynb`, cache-only, no API calls) | pilot | A1-style paired AUROC of R 0.949 [0.915, 0.975] (99 pairs), arith 0.908 [0.853, 0.953]; ρ(R, I) 0.739 [0.669, 0.796]; ρ(Q1, Q2) 0.88; negatives AUROC Q1/Q2/Q3 0.95/0.90/0.70; ρ(R, R′) = ρ(I, I′) = 0.96; single-call ICC(1) ≈ 0.995; batching saves 81% of input tokens; R ≥ 0.9 for 54% FinQA / 82% TAT-QA originals | — | previews only; Q2 coupling raised as blocking question 4 |
 | 2026-10-24 | 03e8a0b+ | Pilot `jev` stage re-run after the tolerance change (cache only) | pilot | no requests sent (call log unchanged at 2,097); determinism 0.0161 ≤ 0.017 → single scoring (repeat 0), batched; outputs now single-call scores, replacing the triplicate means. Owner: keep these outputs, restore nothing | — | the re-run was not requested; the triplicate responses remain in the cache. Notebook re-executed on the current outputs: AUROC of R 0.948 [0.914, 0.975], ρ(R, I) 0.726 [0.653, 0.785] |
+| 2026-10-24 | 98ecc16+ | Full pool, verify (S1) | full | pool 21,829 rows: 19,269 originals (6,145 FinQA, 13,124 TAT-QA), 1,000 negatives; 245 exclusions; 0 leakage removals; all originals verify; 225 negatives (span swaps) pass span verification | yes | pilot outputs snapshotted to `code/runs/pilot_2026-10-24/` (SHA256SUMS) before the full run |
+| 2026-10-24 | 98ecc16+ | Full q3 with real Qwen3-235B (parallel, 8 workers) | full | 20,255 checks (12,055 template, 8,200 LLM); 14 dropped (3 negatives); 8,196 calls, all DeepInfra, $0.76 | yes | two interruptions: OpenRouter 402 (no credit; owner topped up) and a dropped connection (now retried); cached responses reused on resume. Checks not human-validated (owner: run without) |
+| 2026-10-24 | 98ecc16+ | Full Jev run, real API (`jev-1.14.0`) | full | 20,255 items × 6 questions; requests sent 21,444 (20,250 batched + 1,194 single-question), 24.8M input tokens, ≈ $0.20 at the pilot's measured rate; 5 minutes | yes | every reported version `jev-1.14.0`; probabilities sum to 1 |
+| 2026-10-24 | 98ecc16+ | Full-run determinism and batching checks (S1) | full | determinism 0.0124 ≤ 0.017 → single scoring (it would have exceeded the original 0.01); batched vs single 0.0123 ≤ 0.0224 → batched | yes | |
+| 2026-10-24 | 98ecc16+ | Informal headline quantities (not the Spec 3 analysis) | full | paired AUROC of R 0.942 (995 pairs; arith 0.902, lookup 0.989; FinQA 0.890, TAT-QA 0.964); ρ(R, I) originals 0.674 [0.666, 0.681], **FinQA 0.804 [0.795, 0.812]**, TAT-QA 0.560; ρ(Q1, Q2) 0.82; negatives AUROC Q1/Q2/Q3 0.94/0.92/0.75; ρ(R, R′) 0.92, ρ(I, I′) 0.94; R ≥ 0.9: 77% (FinQA 59%, TAT-QA 86%) | — | confirms blocking question 4: overall D3 below 0.8, FinQA above it |
+| 2026-10-25 | 98ecc16+ | Battery v1 pilot test (pre-recorded criteria C1–C4) | pilot | 899 requests sent; determinism 0.0157 ≤ 0.017, batched; C1 0.849 ✗, C2 0.748 ✗, C3 ✓, C4 0.951 ✓ → v1 **rejected**; full pool not re-scored | no | outputs in `code/runs/pilot_v1_2026-10-24/`; v0 snapshots verified intact by SHA256SUMS |
+| 2026-10-25 | 98ecc16+ | Battery v2 pilot test (pre-recorded criteria C1′–C4) | pilot | 1,167 requests sent (499 scoring: 299 judge-state + 200 answer-free, shared by originals and negatives); C1′ ✓, C2 0.582 ✗, C3 ✓, C4 0.965 ✓; ρ(R, I) 0.530 | no | full pool not re-scored; v0/v1 snapshots verified intact |
+| 2026-10-25 | 98ecc16+ | Full Jev run, battery v2 (primary) | full | 20,255 items × 6 questions; 39,905 requests sent (20,251 judge-state 4-question, 19,258 answer-free 2-question, 396 single), 42.5M input tokens ≈ $0.35; determinism 0.0121 → single; batching 0.0118 ≤ 0.0221 → batched; invariants pass | yes | outputs snapshotted to `code/runs/full_v2_2026-10-25/` (SHA256SUMS); live `code/scores/` now v2 |
+| 2026-10-25 | 98ecc16+ | Full-pool battery comparison v0 vs v2 (`notebooks/battery_versions_analysis.ipynb`, read-only) | full | ρ(R, I) 0.674 → 0.458 (FinQA 0.804 → 0.516; TAT-QA 0.560 → 0.356); ρ(Q1, Q2) 0.823 → 0.484; AUROC on negatives R 0.942 → 0.942, I 0.930 → 0.713, Q2 0.922 → 0.500; ρ(R v0, R v2) 0.967; top-20% I overlap 56–68% | — | v2 meets C2 on the full pool (0.48 < 0.50) though it missed it on the pilot (0.58); the exception stays disclosed |
 
 ## Owner decisions log
 
@@ -538,3 +582,6 @@ Real-data, GPU, API and human checks, recorded as they are run. One row per chec
 | 2026-10-24 | Pilot negatives | 100 (pilot only; the full run keeps Spec 1's 1,000): a 200-item pool cannot supply 1,000 negatives |
 | 2026-10-24 | Jev model version changed to `jev-1.14.0` | Owner decision: every experiment uses `jev-1.14.0`, and `jev-1.13.0` is not used anywhere. Supersedes the 2026-10-23 rows above. Both aliases (`jev-latest`, `jev-preview`) resolve to `jev-1.14.0`, but the config names the versioned ID and the client refuses aliases. No real Jev scoring had run under `jev-1.13.0` |
 | 2026-10-24 | Jev determinism tolerance | 0.017 (was 0.01; Spec 1 updated). Set after the pilot showed a mean repeat difference of 0.016, so it must be disclosed in the paper as a pilot-informed choice. Batching margin unchanged (0.01) |
+| 2026-10-24 | P1 LoRA and projection seeds | Both set to 20261024 by the owner in `conf/proxy/influence.yaml`. M6 should derive separate streams from it (e.g. `stable_seed(seed, "lora")`, `stable_seed(seed, "projection")`) so the LoRA A initialisation and the projection matrix are not drawn from the same generator state |
+| 2026-10-25 | Jev battery: v2 primary, v0 sensitivity (option 3) | Recorded 2026-10-25 00:34 UTC, before the full v2 run. Battery v2 is the primary battery despite missing pre-set criterion C2 (ρ(Q1, Q2) = 0.58 > 0.50). This is a disclosed exception: C2 was meant to detect answer leakage, and C1′ shows v2 has none by construction. The full v0 run (`code/runs/full_v0_2026-10-24/`) is the pre-registered sensitivity analysis, and every downstream analysis that uses R or I should be reported under both. v1 is reported only as a pilot measurement result. The paper must state that C2 was missed and why v2 was kept |
+| 2026-10-25 | Q3-only I as a pre-specified robustness analysis | Recorded 2026-10-25 00:59 UTC, before any G or C measurement. Besides the primary I (v2 mean of Q2 and Q3) and the v0 sensitivity analysis (I\_v0), every analysis that uses I is also reported with **I\_Q3 = P(yes | Q3)** (I\_Q3\_para = Q3′). This covers Spec 3 A1, A2, A3 and A5 (new A3b) and Spec 5 H2–H4, with Spec 6's E3 to follow. Gates are decided on the primary I only; disagreements are reported as findings. Full-pool preview: ρ(R, I\_Q3) 0.18 (FinQA 0.34), AUROC of I\_Q3 on negatives 0.75, ρ(I\_Q3, I\_Q3\_para) 0.92. I\_Q3 is near its ceiling (61% ≥ 0.95) and heavily tied (98 distinct values; within R ≥ 0.9 all 720 FinQA top-20% slots would be filled by tie-breaking among 1,230 items at 0.99, and 71% of TAT-QA's), so its selections depend on P8's tie-breaking rule, and the tie-decided share must be reported. Implementation note (M5/M7): the analysis frame must carry `I_v0` (from `code/runs/full_v0_2026-10-24/`), `I_Q3` and `I_Q3_para` next to the primary `I` |

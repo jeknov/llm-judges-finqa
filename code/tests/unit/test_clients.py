@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import http.client
 import io
 import json
 import urllib.error
@@ -347,3 +348,35 @@ def test_real_client_refuses_aliases(make_cfg, monkeypatch, alias):
     monkeypatch.setenv("TYPESAFE_API_KEY", "secret")
     with pytest.raises(ValueError, match="versioned ID"):
         RealJev(make_cfg(f"jev.model={alias}"))
+
+
+def _drop_first(real_urlopen_fake):
+    """Wraps a fake urlopen so that its first call fails with a connection dropped mid-response."""
+    state = {"n": 0}
+
+    def call(req, timeout=None):
+        state["n"] += 1
+        if state["n"] == 1:
+            raise http.client.IncompleteRead(b"partial")
+        return real_urlopen_fake(req, timeout)
+    return call
+
+
+def test_openrouter_retries_a_dropped_connection(cfg, monkeypatch):
+    from fqsel.clients.strong_llm import RealStrongLLM
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "or-secret")
+    fake = FakeOpenRouter()
+    monkeypatch.setattr(urllib.request, "urlopen", _drop_first(fake))
+    sleeps: list[float] = []
+    out = RealStrongLLM(cfg, sleep=sleeps.append).generate_json("PROMPT", SCHEMA, 0.0, 1)
+    assert out["holds_if_answer_true"] is True and len(sleeps) == 1 and len(fake.bodies) == 1
+
+
+def test_jev_retries_a_dropped_connection(make_cfg, monkeypatch, tmp_path):
+    monkeypatch.setenv("TYPESAFE_API_KEY", "secret")
+    ok = lambda req, timeout=None: _Response(LIVE_RESPONSE, {"x-typesafe-request-id": LIVE_REQUEST_ID})  # noqa: E731
+    monkeypatch.setattr(urllib.request, "urlopen", _drop_first(ok))
+    sleeps: list[float] = []
+    resp = _client(RealJev(make_cfg()), tmp_path, sleeps).ask("Revenue was 120 in 2019 and 100 in 2018.", LIVE_QUESTIONS)
+    assert resp.probs == {"q1": 0.99, "q2": 0.01} and len(sleeps) == 1

@@ -4,7 +4,7 @@ lora:
   alpha: 32
   dropout: 0.0
   target_modules: [q_proj, k_proj, v_proj, o_proj]
-  seed: ???                      # P1 — OWNER DECISION PENDING (asked at M6)
+  seed: 20261024                 # P1 — owner decision 2026-10-24
 projection:
   dim: 8192
-  seed: ???                      # P1 — OWNER DECISION PENDING (asked at M6)
+  seed: 20261024                 # P1 — owner decision 2026-10-24

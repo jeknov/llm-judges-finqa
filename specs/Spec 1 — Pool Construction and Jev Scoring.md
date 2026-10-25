@@ -85,6 +85,7 @@ Two further helpers are shared between this spec and Spec 6: `make_wrong_answer(
 | E1-G uncertainty | Bootstrap over probes | Joint bootstrap over probes and pool items | Includes item sampling error |
 | Gate D4 | Any cell below 200 items | Any dataset × cell below 100 items; then relax R to 0.8, then drop the R filter | Demonstrations are drawn per dataset |
 | Out-of-distribution test | FinanceBench subset | Same, hypothesis-tested only if at least 50 items survive filtering | Too few items for inference otherwise |
+| Jev battery | v0 wording frozen before any value measurement | Battery v1: Q2 and Q2′ reworded to assume the stated answer is correct; v0 kept and reported | v0's Q2 measured correctness (ρ(Q1, Q2) = 0.82), coupling R and I; revised before any G or C measurement, under D3's remedy |
 
 ## Pool construction
 
@@ -177,11 +178,18 @@ Jev scores every pool item and every validation negative on six questions: the b
 | Question | Construct | Wording |
 | --- | --- | --- |
 | Q1 | support | Given the context and question, is the stated answer supported by the context? |
-| Q2 | determinacy | Do the context and question determine this answer uniquely, such that no materially different answer would also be defensible? |
+| Q2 | determinacy | Do the context and question determine a single answer uniquely, such that no materially different answer would also be defensible? *(sent on the state without the stated answer)* |
 | Q3 | consequence | Assume the stated answer is true. Does it entail the following check? Check: {check\_text} |
 | Q1′ | support | Does the information provided back up the answer given to this question? |
-| Q2′ | determinacy | Is this the only reasonable answer to the question given the information, rather than one of several defensible answers? |
+| Q2′ | determinacy | Is there only one reasonable answer to this question given the information, rather than several defensible answers? *(sent on the state without the stated answer)* |
 | Q3′ | consequence | If the answer given is correct, must the following statement also be correct? Statement: {check\_text} |
+
+**Battery versions.** The table is the primary battery **v2** (`prompts/jev_battery_v2.yaml`). Q1, Q3, Q1′ and Q3′ go in one request on the `judge` state. Q2 and Q2′ go in a second request on the `qa` state (context and question only), which an original and its negative share. Battery **v1** (`prompts/jev_battery_v1.yaml`) was tested and not adopted. It reworded Q2 as "Assume the stated answer is correct. Is the question, read against the context, specific enough that no materially different answer could also be correct?" and Q2′ as "Suppose the answer given is right. Does the information pin the question down so that only one answer, and no materially different one, could be right?". Battery **v0** (`prompts/jev_battery_v0.yaml`, kept unchanged) was used for the pilot and the first full run. It differed only in Q2 and Q2′:
+
+- Q2 (v0): Do the context and question determine this answer uniquely, such that no materially different answer would also be defensible?
+- Q2′ (v0): Is this the only reasonable answer to the question given the information, rather than one of several defensible answers?
+
+Under v0, Q2 tracked correctness rather than determinacy: ρ(Q1, Q2) = 0.82 on the full pool, and AUROC 0.92 against the negatives. As a result ρ(R, I) reached 0.80 on FinQA. v1 conditions Q2 on the stated answer being correct, as Q3 already does, so that I measures implication given that the datum is true, which is the thesis's definition. This applies D3's own remedy (revise Q2 before E1) before any value measurement. The v1 acceptance criteria were fixed before any v1 score was seen; see the plan. The v0 scores are kept in `code/runs/`. **Pilot test (25 October 2026): v1 failed two of the four criteria.** Q2's AUROC on negatives was 0.85 (threshold 0.75) and ρ(Q1, Q2) was 0.75 (threshold 0.50), so the full pool was not re-scored with v1. A battery **v2** (`prompts/jev_battery_v2.yaml`) was then tested. It scores Q2 and Q2′ on a second state without the stated answer, with v0's wording ('this answer' → 'a single answer'). It removed answer leakage by construction and lowered ρ(R, I) to 0.53 on the pilot, but ρ(Q1, Q2) remained 0.58, above the pre-set 0.50. **Decision (25 October 2026): v2 is the primary battery and v0 the pre-registered sensitivity analysis.** v2 is kept despite missing C2, as a disclosed exception: C2 was meant to detect answer leakage, which v2 removes by construction. Every analysis that uses R or I is reported under both batteries.
 
 **Validation negatives.** Draw 1,000 pool items stratified by dataset and `answer_type`. For each, create a copy with `item_id` suffix `#neg` and a wrong gold answer:
 

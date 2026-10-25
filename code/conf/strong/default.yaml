@@ -12,6 +12,7 @@ provider:
   require_parameters: true     # refuse endpoints that would ignore temperature/seed/schema
 expected_provider: DeepInfra   # a response reporting any other provider is an error
 timeout_s: 120
+max_workers: 8                 # parallel requests in the q3 stage (operational, not an analysis parameter)
 retry:
   max_attempts: 6
   base_delay_s: 1.0

@@ -1,0 +1,15 @@
+# STATUS: FINAL
+# Spec 1, Jev battery v2 (owner decision 2026-10-25, after v1 failed its pilot criteria). Q1, Q3, Q1', Q3'
+# are v0's wording on the usual `judge` state (context, question, stated answer). Q2 and Q2' are sent in a
+# second request whose state is the `qa` rendering (context and question only), so determinacy cannot see
+# the stated answer; their wording is v0's with "this answer" replaced by "a single answer". Frozen:
+# changing a wording invalidates all scores and requires bumping jev.battery_version. Snapshot-tested.
+answer_free: [q2]              # questions scored on the state without the stated answer (both batteries)
+orig:
+  q1: "Given the context and question, is the stated answer supported by the context?"
+  q2: "Do the context and question determine a single answer uniquely, such that no materially different answer would also be defensible?"
+  q3: "Assume the stated answer is true. Does it entail the following check? Check: {check_text}"
+para:
+  q1: "Does the information provided back up the answer given to this question?"
+  q2: "Is there only one reasonable answer to this question given the information, rather than several defensible answers?"
+  q3: "If the answer given is correct, must the following statement also be correct? Statement: {check_text}"

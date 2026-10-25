@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import threading
 from pathlib import Path
 
 
@@ -26,6 +27,6 @@ class JsonCache:
     def put(self, key: str, value) -> None:
         path = self._path(key)
         path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix(f".{os.getpid()}.tmp")
+        tmp = path.with_suffix(f".{os.getpid()}.{threading.get_ident()}.tmp")  # unique per writer thread
         tmp.write_text(json.dumps(value, sort_keys=True))
         os.replace(tmp, path)

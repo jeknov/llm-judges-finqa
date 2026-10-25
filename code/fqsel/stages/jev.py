@@ -10,6 +10,10 @@ single-question probabilities differ by no more than the repeat difference plus 
 otherwise every item is scored one question per request. Both results and the selected mode are written
 to results/jev_manifest.json.
 
+A battery may list `answer_free` questions (v2: Q2 and Q2'); those are sent in a second request per item
+whose state is the `qa` rendering, without the stated answer. An original and its negative share that
+request, which is sent once.
+
 R_b = P(yes | Q1_b); I_b = mean(P(yes | Q2_b), P(yes | Q3_b)); V_b = R_b x I_b;
 indecision_b = max over the three questions of the binary entropy of P(yes), in bits.
 """
@@ -25,7 +29,7 @@ import pandas as pd
 import yaml
 from omegaconf import DictConfig
 
-from fqsel.clients.jev import JevClient, JevResponse, make_jev
+from fqsel.clients.jev import JevClient, JevResponse, canonical_questions, make_jev
 from fqsel.config import PROMPTS_DIR, PlaceholderError, prompt_status, root_dir
 from fqsel.ids import rng
 from fqsel.io import read_table, write_table
@@ -37,10 +41,12 @@ QIDS = {("orig", q): q for q in QUESTIONS} | {("para", q): f"{q}p" for q in QUES
 QID_TO_KEY = {v: k for k, v in QIDS.items()}
 
 
-def load_battery() -> dict:
-    if prompt_status("jev_battery.yaml") != "FINAL":
-        raise PlaceholderError("prompts/jev_battery.yaml must be FINAL")
-    return yaml.safe_load((PROMPTS_DIR / "jev_battery.yaml").read_text())
+def load_battery(version: str) -> dict:
+    """The frozen battery prompts/jev_battery_<version>.yaml (cfg.jev.battery_version)."""
+    name = f"jev_battery_{version}.yaml"
+    if prompt_status(name) != "FINAL":
+        raise PlaceholderError(f"prompts/{name} must be FINAL")
+    return yaml.safe_load((PROMPTS_DIR / name).read_text())
 
 
 def build_questions(battery: dict, check_text: str) -> dict[str, str]:
@@ -55,21 +61,43 @@ def binary_entropy(p: float) -> float:
     return -(p * math.log2(p) + (1 - p) * math.log2(1 - p))
 
 
-def _requests(states: dict, questions: dict, item_ids, batched: bool) -> list[tuple[str, dict[str, str]]]:
-    """(item_id, question subset) per request: one per item when batched, else one per question."""
-    if batched:
-        return [(i, questions[i]) for i in item_ids]
-    return [(i, {qid: text}) for i in item_ids for qid, text in questions[i].items()]
+def state_kind(battery: dict, qid: str) -> str:
+    """`qa` (context and question only) for the battery's answer-free questions, else `judge`."""
+    return "qa" if QID_TO_KEY[qid][1] in battery.get("answer_free", []) else "judge"
+
+
+def _requests(questions: dict, item_ids, batched: bool, battery: dict) -> list[tuple[str, str, dict[str, str]]]:
+    """(item_id, state kind, question subset) per request: one per item and state kind when batched,
+    else one per question."""
+    plan = []
+    for i in item_ids:
+        by_kind: dict[str, dict[str, str]] = {}
+        for qid, text in questions[i].items():
+            by_kind.setdefault(state_kind(battery, qid), {})[qid] = text
+        for kind in sorted(by_kind):
+            if batched:
+                plan.append((i, kind, by_kind[kind]))
+            else:
+                plan += [(i, kind, {qid: text}) for qid, text in by_kind[kind].items()]
+    return plan
 
 
 def _send(client: JevClient, states, plan, repeats, workers) -> list[tuple[str, int, JevResponse]]:
-    """Requests in parallel within a repeat round; rounds run one after another, so identical
-    requests are never in flight together and repeat r is always the r-th time a request is sent."""
+    """Requests in parallel within a repeat round; rounds run one after another, and identical requests
+    (e.g. an original and its negative on the answer-free state) are sent once per round, so they are
+    never in flight together and repeat r is always the r-th time a request is sent."""
     out = []
+    unique: dict[tuple[str, str], tuple[str, dict[str, str]]] = {}
+    keys = []
+    for item_id, kind, qs in plan:
+        key = (states[(item_id, kind)], canonical_questions(qs))
+        unique.setdefault(key, (states[(item_id, kind)], qs))
+        keys.append(key)
     with ThreadPoolExecutor(max_workers=workers) as pool:
         for r in repeats:
-            resps = list(pool.map(lambda j, r=r: client.ask(states[j[0]], j[1], repeat=r), plan))
-            out += [(item_id, r, resp) for (item_id, _), resp in zip(plan, resps, strict=True)]
+            sent = dict(zip(unique, pool.map(lambda sq, r=r: client.ask(sq[0], sq[1], repeat=r), unique.values()),
+                            strict=True))
+            out += [(item_id, r, sent[key]) for (item_id, _, _), key in zip(plan, keys, strict=True)]
     return out
 
 
@@ -81,14 +109,14 @@ def _probs_by_repeat(results) -> dict[tuple[str, str, int], float]:
     return out
 
 
-def preflight_checks(client, states, questions, item_ids, cfg) -> dict:
+def preflight_checks(client, states, questions, item_ids, cfg, battery: dict) -> dict:
     """Determinism (batched x2) and batching (batched vs single-question) checks on a sample."""
     dcfg = cfg.jev.determinism
     n = min(int(dcfg.n_items), len(item_ids))
     sample = sorted(item_ids[i] for i in rng(cfg.global_seed, "jev_determinism").permutation(len(item_ids))[:n])
     workers = cfg.jev.max_workers
-    batched = _send(client, states, _requests(states, questions, sample, True), [0, 1], workers)
-    single = _send(client, states, _requests(states, questions, sample, False), [0], workers)
+    batched = _send(client, states, _requests(questions, sample, True, battery), [0, 1], workers)
+    single = _send(client, states, _requests(questions, sample, False, battery), [0], workers)
     pb, ps = _probs_by_repeat(batched), _probs_by_repeat(single)
     keys = [(i, qid) for i in sample for qid in questions[i]]
     repeat_diff = float(np.mean([abs(pb[(i, q, 0)] - pb[(i, q, 1)]) for i, q in keys])) if keys else 0.0
@@ -126,18 +154,19 @@ def aggregate(long: pd.DataFrame, negative_ids: set[str]) -> pd.DataFrame:
 
 def run(cfg: DictConfig, client: JevClient | None = None) -> None:
     client = client or make_jev(cfg)
-    battery = load_battery()
+    battery = load_battery(cfg.jev.battery_version)
     pool = read_table("pool", cfg)
     checks = read_table("q3_checks", cfg).set_index("item_id")["check_text"].to_dict()
     targets = pool[(pool["split"] == "pool") & pool["item_id"].isin(checks)]
-    states = {row["item_id"]: render_item(row, "judge") for _, row in targets.iterrows()}
-    questions = {i: build_questions(battery, checks[i]) for i in states}
-    item_ids = sorted(states)
+    kinds = {state_kind(battery, qid) for qid in QID_TO_KEY}
+    states = {(row["item_id"], kind): render_item(row, kind) for _, row in targets.iterrows() for kind in kinds}
+    item_ids = sorted(targets["item_id"])
+    questions = {i: build_questions(battery, checks[i]) for i in item_ids}
 
-    pre = preflight_checks(client, states, questions, item_ids, cfg)
+    pre = preflight_checks(client, states, questions, item_ids, cfg, battery)
     repeats = list(range(int(cfg.jev.determinism.repeats))) if pre["determinism"]["triplicate"] else [0]
     batched = pre["batching"]["mode"] == "batched"
-    results = _send(client, states, _requests(states, questions, item_ids, batched), repeats, cfg.jev.max_workers)
+    results = _send(client, states, _requests(questions, item_ids, batched, battery), repeats, cfg.jev.max_workers)
 
     versions = {resp.model_version for _, _, resp in results}
     if len(versions) != 1:
@@ -153,9 +182,9 @@ def run(cfg: DictConfig, client: JevClient | None = None) -> None:
             probs.setdefault((item_id, qid), []).append(p)
             rids.setdefault((item_id, qid), []).append(resp.request_id)
             stamps[(item_id, qid)] = max(stamps.get((item_id, qid), ""), resp.timestamp)
-        requests[resp.request_id] = {"request_id": resp.request_id, "item_id": item_id,
+        requests.setdefault(resp.request_id, {"request_id": resp.request_id, "item_id": item_id,
                                      "n_questions": len(resp.probs), "input_tokens": int(resp.input_tokens),
-                                     "jev_model_version": resp.model_version, "timestamp": resp.timestamp}
+                                     "jev_model_version": resp.model_version, "timestamp": resp.timestamp})
 
     long_rows = []
     for item_id, qid in sorted(probs):
@@ -175,7 +204,7 @@ def run(cfg: DictConfig, client: JevClient | None = None) -> None:
     negatives = set(targets.loc[targets["is_derived"], "item_id"])
     write_table("jev_scores", aggregate(long, negatives), cfg)
 
-    manifest = {**pre, "jev_model": client.model, "jev_model_version": version,
+    manifest = {**pre, "battery_version": cfg.jev.battery_version, "jev_model": client.model, "jev_model_version": version,
                 "full_run": {"mode": pre["batching"]["mode"], "repeats": len(repeats), "requests": len(req_df),
                              "input_tokens": int(req_df["input_tokens"].sum())}}
     out = root_dir(cfg) / "results" / "jev_manifest.json"

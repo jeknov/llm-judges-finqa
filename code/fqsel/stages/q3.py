@@ -7,6 +7,8 @@ labels are imported (python -m fqsel annotate import q3_validation).
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+
 import pandas as pd
 from omegaconf import DictConfig
 
@@ -23,8 +25,11 @@ def run(cfg: DictConfig) -> None:
     targets = pool[pool["split"] == "pool"]
     llm = make_strong(cfg)
     rows, dropped = [], []
-    for _, item in targets.iterrows():
-        check = generate_check(item, cfg, llm)
+    items = [item for _, item in targets.iterrows()]
+    # each check depends only on its own item and seed, so parallel requests give the same table
+    with ThreadPoolExecutor(max_workers=int(cfg.model.strong.max_workers)) as pool:
+        results = list(pool.map(lambda item: generate_check(item, cfg, llm), items))
+    for item, check in zip(items, results, strict=True):
         if check is None:
             dropped.append({"item_id": item["item_id"], "reason": "llm_fallback_failed_twice"})
             continue

@@ -52,6 +52,8 @@ G_i = \beta_0 + \beta_1 I_i + \beta_2 S_i + \beta_3 (I_i \times S_i) + \beta_4 R
 
 **Robustness, reported but not confirmatory.** Refit with `G_dot` in place of G, with I\_para in place of I, and within each dataset separately.
 
+**Alternative definitions of I (pre-specified robustness, added 25 October 2026 before any G or C measurement).** H2–H4 are re-estimated, not confirmatorily, with I replaced by **I\_v0** (the mean of Q2 and Q3 under the pre-registered battery v0) and by **I\_Q3** (P(yes | Q3) alone); see Spec 3, A3b. This covers the E1-G regression, the E2 slope, and the C conditions that depend on I (`top_V`, `top_I_resid`, the four cells and the five quintiles). Those conditions are rebuilt for each alternative, with their own medians and quintile cut points. Report one table with each hypothesis's verdict under the primary I, I\_v0 and I\_Q3, and describe any disagreement as a finding. I\_Q3 is heavily tied, and on the full pool many more items share the top-20% cutoff value than there are slots. So its top-20% and quintile selections use the tie-breaking rule set for the primary conditions (placeholder P8), and the share of each eligible set decided by tie-breaking is reported. Spec 6's high-I × high-S cell follows the same rule when E3 is repeated under I\_Q3.
+
 ## E1-C: demonstration conditions
 
 Under proxy C the unit of analysis is a test item answered under one draw of one condition. Models are fit on in-distribution test items only. FinanceBench results are reported with the same models fit separately, and only if at least 50 items survived Spec 4's filter.

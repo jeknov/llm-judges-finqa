@@ -168,3 +168,17 @@ def test_planted_duplicate_and_leak_are_removed(make_cfg, synth_raw, tmp_path, b
     assert leak.loc["finqa:ZZZ/near/page_1.pdf-1", "jaccard"] >= 0.9
     pool = read_table("pool", cfg)
     assert not set(pool["item_id"]) & {"finqa:ZZZ/near/page_1.pdf-1", "finqa:ZZZ/dup/page_1.pdf-1"}
+
+
+def test_q3_parallel_matches_sequential(built, tmp_path):
+    """The q3 stage sends LLM requests in parallel; the checks must equal a one-worker run."""
+    cfg, _ = built
+    parallel = read_table("q3_checks", cfg)
+    seq_cfg = cfg.copy()
+    seq_cfg.paths.root = str(tmp_path)
+    table_path(seq_cfg, "pool").parent.mkdir(parents=True)
+    shutil.copy(table_path(cfg, "pool"), table_path(seq_cfg, "pool"))
+    seq_cfg.model.strong.max_workers = 1
+    run_stage("q3", seq_cfg)
+    pd.testing.assert_frame_equal(parallel.reset_index(drop=True), read_table("q3_checks", seq_cfg).reset_index(drop=True))
+    assert int(cfg.model.strong.max_workers) > 1
