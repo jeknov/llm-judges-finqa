@@ -7,6 +7,7 @@ defaults:
   - annotation: default
   - proxy: influence
   - stats: default
+  - surprisal: default
   - profile: tiny
   - _self_
 

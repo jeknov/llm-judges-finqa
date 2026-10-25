@@ -14,7 +14,7 @@ expected_provider: DeepInfra   # a response reporting any other provider is an e
 timeout_s: 120
 max_workers: 8                 # parallel requests in the q3 stage (operational, not an analysis parameter)
 retry:
-  max_attempts: 6
+  max_attempts: 10             # ~4 min of backoff; 6 attempts gave up on OpenRouter 429s without retry-after (2026-10-25)
   base_delay_s: 1.0
   max_delay_s: 60.0
 q3_first_temperature: 0.0      # first Q3 fallback attempt is greedy; Spec 1 fixes only the retry temperature

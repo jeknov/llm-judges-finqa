@@ -36,6 +36,8 @@ S is the mean negative log-likelihood per token of the gold answer, scored in th
 3. Run the sequence through vLLM with `prompt_logprobs` enabled and `max_tokens = 1`, and read the log-probability of each actual token in the answer span.
 4. Store `nll_sum` (summed over the span), `n_answer_tokens`, and `nll_mean = nll_sum / n_answer_tokens`.
 
+**Implementation note (25 October 2026).** The boundary is placed after `Answer:`, before the following space. BPE tokenizers, including OLMo 3's, attach a leading space to the next token (` 12`). With the boundary after the space, 11 of 20 hand-picked answers needed boundary adjustment, against the < 1% acceptance limit. With it before the space, none did. The answer span therefore includes the space-prefixed first answer token: decoding it gives the answer with one leading space, the same for every item.
+
 This procedure is implemented once, as `answer_nll(items, fmt, demos)` in `fqsel/nll.py`. Spec 3 calls it with context removed, with fixed demonstrations, and with the instruction removed; Spec 6 calls it on manipulated items. Callers change only the messages, never the span logic.
 
 **Normalization.** Raw NLL depends on answer length and number formatting, which differ between FinQA and TAT-QA. The analysis variable is therefore the within-dataset percentile rank of `nll_mean`, stored as `S` in \[0, 1\]. Median splits for the I × S cells (Spec 5) are taken on this within-dataset rank, so that each cell holds both datasets in proportion.
@@ -88,7 +90,7 @@ Two variables leave this spec for analysis: `S`, the within-dataset percentile o
 | `modal_share` | float | Share of samples giving it |
 | `boundary_adjusted` | bool | True if the answer span boundary was moved |
 
-The raw generations go to `runs/surprisal/samples.parquet` (item, sample index, seed, text, extracted answer, correct) so that any score can be audited.
+The raw generations go to `scores/surprisal_samples.parquet` (item, sample index, seed, text, extracted answer, correct) so that any score can be audited. They were first specified as `runs/surprisal/samples.parquet`; `runs/` now holds the DVC-tracked result snapshots.
 
 ## Acceptance tests and open items
 

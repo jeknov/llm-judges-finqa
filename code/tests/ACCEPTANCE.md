@@ -27,18 +27,18 @@ GPU, API or later-milestone part remains, noted in the last column), `pending` (
 | S1-16 | MockJev and the real client pass the same interface test: argument types, one P(yes) in [0, 1] per question ID, same handling of a 429 with retry-after | partial | real client tested against a fake HTTP endpoint with test-only response fields; the real field names must come from TypeSafe's API reference |
 | S1-17 | Every scored item has exactly one batched six-question request in jev_requests.parquet (three if repeats), answers mapped to the right question IDs | implemented | on MockJev; `api` run pending |
 | S1-18 | Batched-versus-single-question check on 200 items recorded; full run used the selected mode | partial | logic and both outcomes tested on mocks; the real 200-item check is `api` |
-| S2-01 | Every item has one row; S non-null for pool items | pending | M4 |
-| S2-02 | Answer-span assertion passes or boundary adjusted and logged; < 1% adjusted | pending | M4 |
-| S2-03 | vLLM and fp32 Transformers NLL within 0.05 nats on 200 items | pending | M4, `gpu` |
+| S2-01 | Every item has one row; S non-null for pool items | partial | M4: tiny synthetic run; full run needs the GPU node |
+| S2-02 | Answer-span assertion passes or boundary adjusted and logged; < 1% adjusted | partial | M4: 20 hand-picked answers exact with the toy and the OLMo 3 tokenizer (`real_data`), 0 adjusted; share on the full pool needs the GPU run |
+| S2-03 | vLLM and fp32 Transformers NLL within 0.05 nats on 200 items | partial | M4, `gpu`: test written (`tests/unit/test_backends.py`), runs on the GPU node |
 | S2-04 | Unparsed <= 5% overall and <= 10% per dataset | pending | M4 |
 | S2-05 | 50-item hand check of extract_answer shows no errors | pending | M4, human |
-| S2-06 | Same seeds reproduce every acc | pending | M4 |
-| S2-07 | S uniform on [0, 1] within each dataset (KS p > 0.05) | pending | M4 |
-| S2-08 | answer_nll unit tests: toy 3-token sum exact; 20 hand-picked spans exact | pending | M4 |
+| S2-06 | Same seeds reproduce every acc | partial | M4: toy model, HF backend; vLLM to confirm on the GPU node |
+| S2-07 | S uniform on [0, 1] within each dataset (KS p > 0.05) | partial | M4: percentile function tested; full-pool check after the GPU run |
+| S2-08 | answer_nll unit tests: toy 3-token sum exact; 20 hand-picked spans exact | implemented | `tests/unit/test_nll.py` |
 | S2-09 | Chat template renders no thinking/reasoning block | implemented | `real_data`: OLMo 3 7B Instruct template at the pinned revision; neither format renders a reasoning block |
-| S2-10 | Sampling 20 items in a fresh process reproduces identical text | pending | M4 |
+| S2-10 | Sampling 20 items in a fresh process reproduces identical text | partial | M4: toy model on the HF backend; vLLM to confirm on the GPU node |
 | S3-01 | Comparators non-null for every pool item; judge_quality >= 99% | pending | M5 |
-| S3-02 | Self-consistency covers exactly the stored 3,000-item subsample | pending | M5 |
+| S3-02 | Self-consistency covers exactly the stored 3,000-item subsample | partial | M5; tested on the synthetic pool (`tests/schema/test_self_consistency.py`); full-pool run 2026-10-25 |
 | S3-03 | Synthetic AUROC 0.8 recovered within 0.02; cluster bootstrap keeps pairs | pending | M5 |
 | S3-04 | Every A1–A6 table follows the shared schema with non-null n | pending | M5 |
 | S3-05 | gates.json validates against conf/ schema; medians match recomputation | partial | schema validation implemented (M1); medians at M5 |

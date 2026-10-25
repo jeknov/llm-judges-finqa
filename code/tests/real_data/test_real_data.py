@@ -149,3 +149,20 @@ def test_token_budget_with_base_tokenizer(base_tokenizer):
     assert all(r < 0.05 for r in rates.values())
     fb_kept = total[("financebench", "test")] - over[("financebench", "test")]
     assert fb_kept >= 50, "Spec 4 needs >= 50 FinanceBench items to hypothesis-test out-of-distribution results"
+
+
+
+@pytest.mark.spec("S2-02")
+def test_answer_span_with_the_base_tokenizer(base_tokenizer):
+    """The 20 hand-picked answers, through OLMo 3's own chat template and tokenizer."""
+    from fqsel.nll import answer_span
+    from tests.unit.test_nll import ANSWERS, KnownLogprobs, _messages
+
+    backend = KnownLogprobs(base_tokenizer)
+    adjusted = 0
+    for answer in ANSWERS:
+        span = answer_span(backend, _messages(answer))
+        adjusted += span.boundary_adjusted
+        if not span.boundary_adjusted:
+            assert base_tokenizer.decode(span.ids[span.start: span.end]) == " " + answer
+    assert adjusted == 0, f"{adjusted} answers needed boundary adjustment"

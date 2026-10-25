@@ -34,7 +34,7 @@ STAGES: list[Stage] = [
     Stage("verify", 1, "M2", "verify", ignores=(*_EARLY, "jev")),
     Stage("q3", 1, "M2", "q3", ignores=(*_EARLY, "jev")),
     Stage("jev", 1, "M3", "jev", ignores=_EARLY),
-    Stage("surprisal", 2, "M4"),
+    Stage("surprisal", 2, "M4", "surprisal", ignores=(*_EARLY, "jev")),
     Stage("comparators", 3, "M5"),
     Stage("e0", 3, "M5"),
     Stage("gates", 3, "M5"),

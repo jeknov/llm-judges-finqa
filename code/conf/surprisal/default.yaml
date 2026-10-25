@@ -1,0 +1,12 @@
+# Spec 2, base-model surprisal. All values are fixed by the spec.
+n_samples: 5
+temperature: 0.7
+top_p: 0.95
+max_new_tokens: 512
+seed_label: surprisal          # sample seeds: stable_seed(global_seed, item_id, "surprisal")
+batch_size: 64                 # items per backend call (operational)
+crosscheck_n: 200              # vLLM vs fp32 Transformers NLL cross-check items (gpu test)
+crosscheck_tol_nats: 0.05
+unparsed_max: 0.05             # overall share of unparsed samples
+unparsed_max_per_dataset: 0.10
+boundary_adjusted_max: 0.01

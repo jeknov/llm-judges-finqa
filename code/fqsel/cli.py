@@ -1,4 +1,5 @@
-"""Command line: python -m fqsel {run <stage> | check | annotate export|import <task>} [hydra overrides]."""
+"""Command line: python -m fqsel {run <stage> | check | annotate export|import <task> | self-consistency}
+[hydra overrides]."""
 
 from __future__ import annotations
 
@@ -22,10 +23,14 @@ def main(argv: list[str] | None = None) -> int:
     p_ann.add_argument("action", choices=["export", "import"])
     p_ann.add_argument("task")
     p_ann.add_argument("overrides", nargs="*")
+    p_sc = sub.add_parser("self-consistency",
+                          help="Spec 3 comparator sc_acc/sc_modal_share on the 3,000-item subsample (strong LLM only)")
+    p_sc.add_argument("overrides", nargs="*")
     args = parser.parse_args(argv)
 
-    # a command skips only the placeholders of the stage whose data it reads; annotation tasks are all Q3's
-    stage = args.stage if args.command == "run" else "q3" if args.command == "annotate" else None
+    # a command skips only the placeholders of the stage whose data it reads; annotation tasks are all Q3's,
+    # and self-consistency reads only Spec 1 outputs and the strong-LLM settings, like the jev stage
+    stage = {"run": getattr(args, "stage", None), "annotate": "q3", "self-consistency": "jev"}.get(args.command)
     cfg = load_config(args.overrides, ignore=get_stage(stage).ignores if stage else ())
     if args.command == "run":
         try:
@@ -41,6 +46,11 @@ def main(argv: list[str] | None = None) -> int:
             print(f"FAIL: {p}")
         print("check: OK" if not problems else f"check: {len(problems)} problem(s)")
         return 1 if problems else 0
+    if args.command == "self-consistency":
+        from fqsel.comparators import self_consistency
+
+        self_consistency.run(cfg)
+        return 0
     from fqsel import q3_validation
 
     if args.action == "export":

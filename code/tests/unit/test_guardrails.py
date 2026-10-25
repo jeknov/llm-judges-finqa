@@ -118,7 +118,8 @@ def test_spec1_stages_ignore_only_later_decisions():
         assert {"proxy", "stats", "judge_quality.txt"} <= ignores
         assert not ignores & {"data", "model", "q3_fallback.txt", "jev_battery_v0.yaml", "jev_battery_v1.yaml"}
     assert "jev" not in get_stage("jev").ignores
-    assert all(not s.ignores for s in STAGES if s.spec > 1)
+    assert set(get_stage("surprisal").ignores) == {"proxy", "stats", "judge_quality.txt", "jev"}  # Spec 2 needs only the pool
+    assert all(not s.ignores for s in STAGES if s.spec > 2)
 
 
 def test_jev_stage_loads_for_real_runs_but_refuses_its_own_placeholders():

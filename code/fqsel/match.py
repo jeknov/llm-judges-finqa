@@ -139,3 +139,16 @@ def answers_match(pred, gold, answer_type: str) -> bool:
         p = parse_number(str(pred))
         return p is not None and numbers_match(p, g)
     return normalize_span(str(pred)) == normalize_span(gold)
+
+
+def modal_group(answers, answer_type: str) -> tuple[str | None, int]:
+    """(first member of the largest group of mutually matching answers, its size); ties go to the earliest
+    answer; None (unparsed) answers form no group. Shared by Spec 2 (modal_share) and Spec 3 (sc_modal_share)."""
+    best, size = None, 0
+    for a in answers:
+        if a is None:
+            continue
+        n = sum(b is not None and answers_match(b, a, answer_type) for b in answers)
+        if n > size:
+            best, size = a, n
+    return best, size

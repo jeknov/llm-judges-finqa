@@ -21,6 +21,9 @@ data:
   q3:
     validation_n: 10              # TEST-ONLY (spec: 100)
 
+surprisal:
+  max_new_tokens: 24            # TEST-ONLY (spec: 512); the toy model's text is noise anyway
+
 jev:
   determinism:
     n_items: 10                   # TEST-ONLY (spec: 200)

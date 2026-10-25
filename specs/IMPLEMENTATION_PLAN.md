@@ -260,24 +260,26 @@ jev-workshop-paper/
 ---
 
 ## M4 — Base-model surprisal (Spec 2): `surprisal`
-- [ ] `nll.answer_nll` with span logic + boundary adjustment
-- [ ] vLLM `prompt_logprobs`; fp32 Transformers cross-check
-- [ ] 5 reason-format samples, per-item seeds; `acc`, modal answer
-- [ ] `S` = within-dataset percentile
+**Status (2026-10-25): code done and tested locally (toy model, HF backend); the full run waits for a GPU node.**
+- [x] `nll.answer_nll` with span logic + boundary adjustment (boundary after "Answer:", see Spec 2's implementation note)
+- [x] vLLM `prompt_logprobs` path (existing backend); fp32 Transformers cross-check written as a `gpu` test
+- [x] 5 reason-format samples, per-item seeds; `acc`, modal answer (shared `match.modal_group`)
+- [x] `S` = within-dataset percentile, (rank − 0.5) / n
+- [ ] Full run on the GPU node (`python -m fqsel run surprisal profile=full`), then `pytest -m gpu`
 
 ### M4 tests
-- [ ] `answer_nll` on a 3-token toy answer with known log-probs: exact sum (S2)
-- [ ] 20 hand-picked answers (leading spaces, %, negatives): span covers exactly the answer tokens (S2)
+- [x] `answer_nll` with known log-probs: exact sum (S2)
+- [x] 20 hand-picked answers (leading spaces, %, negatives): span covers exactly the answer tokens, toy and OLMo 3 tokenizers, 0 adjusted (S2)
 - [ ] (added) Decoding the span tokens reproduces `gold_answer` (up to leading whitespace) for every tiny-profile item
 - [ ] Span assertion passes or boundary adjusted and logged for 100% of items; < 1% adjusted (S2)
-- [ ] (`gpu`) vLLM vs fp32 Transformers within 0.05 nats on 200 items (S2)
+- [ ] (`gpu`) vLLM vs fp32 Transformers within 0.05 nats on 200 items (S2) — test written
 - [ ] Unparsed ≤ 5% overall, ≤ 10% per dataset (S2)
 - [ ] (human) 50-item hand check of `extract_answer`: no errors (S2)
-- [ ] Same seeds reproduce every `acc`; 20 items in a fresh process give identical text (S2)
+- [x] Same seeds reproduce every `acc`; 20 items in a fresh process give identical text (S2) — HF backend; vLLM to confirm
 - [ ] `S` uniform within each dataset (KS p > 0.05) (S2)
 - [ ] No thinking/reasoning block in the rendered chat template (S2)
-- [ ] (added) `S` is computed within dataset: permuting the other dataset's NLLs leaves it unchanged
-- [ ] (added) `#neg` items are not scored; every non-derived item in all splits has one row (S2)
+- [x] (added) `S` is computed within dataset: permuting the other dataset's NLLs leaves it unchanged
+- [x] (added) `#neg` items are not scored; every non-derived item in all splits has one row (S2)
 
 ---
 
@@ -538,7 +540,7 @@ Real-data, GPU, API and human checks, recorded as they are run. One row per chec
 | 2026-10-24 | 03e8a0b | Jev batching check (S1) | pilot | batched vs single-question 0.0153 ≤ allowed 0.0261 (repeat difference + 0.01) → batched mode kept | yes | |
 | 2026-10-24 | 03e8a0b | Informal R sanity check (not the Spec 3 analysis) | pilot | AUROC originals vs negatives: R 0.962, R′ 0.957; Spearman R~R′ 0.987, I~I′ 0.975 | — | 199 originals vs 100 negatives; the D-gate AUROC is computed in Spec 3 |
 | 2026-10-24 | 03e8a0b+ | Correction to the pilot Jev rows above | pilot | requests actually sent: 2,097 (1,200 single-question + 897 batched), 2.51M input tokens, from `.cache/logs/jev_calls.jsonl`; the scoring run reused the preflight's 400 cached batched responses, which the manifest's `full_run` counts include. Informal AUROC row: 200 originals vs 99 negatives (not 199 vs 100), unpaired | — | the corrected figures are in the notebook |
-| 2026-10-24 | 03e8a0b+ | Pilot Jev analysis (`notebooks/pilot_jev_analysis.ipynb`, cache-only, no API calls) | pilot | A1-style paired AUROC of R 0.949 [0.915, 0.975] (99 pairs), arith 0.908 [0.853, 0.953]; ρ(R, I) 0.739 [0.669, 0.796]; ρ(Q1, Q2) 0.88; negatives AUROC Q1/Q2/Q3 0.95/0.90/0.70; ρ(R, R′) = ρ(I, I′) = 0.96; single-call ICC(1) ≈ 0.995; batching saves 81% of input tokens; R ≥ 0.9 for 54% FinQA / 82% TAT-QA originals | — | previews only; Q2 coupling raised as blocking question 4 |
+| 2026-10-24 | 03e8a0b+ | Pilot Jev analysis (`notebooks/01_pilot_jev_analysis.ipynb`, cache-only, no API calls) | pilot | A1-style paired AUROC of R 0.949 [0.915, 0.975] (99 pairs), arith 0.908 [0.853, 0.953]; ρ(R, I) 0.739 [0.669, 0.796]; ρ(Q1, Q2) 0.88; negatives AUROC Q1/Q2/Q3 0.95/0.90/0.70; ρ(R, R′) = ρ(I, I′) = 0.96; single-call ICC(1) ≈ 0.995; batching saves 81% of input tokens; R ≥ 0.9 for 54% FinQA / 82% TAT-QA originals | — | previews only; Q2 coupling raised as blocking question 4 |
 | 2026-10-24 | 03e8a0b+ | Pilot `jev` stage re-run after the tolerance change (cache only) | pilot | no requests sent (call log unchanged at 2,097); determinism 0.0161 ≤ 0.017 → single scoring (repeat 0), batched; outputs now single-call scores, replacing the triplicate means. Owner: keep these outputs, restore nothing | — | the re-run was not requested; the triplicate responses remain in the cache. Notebook re-executed on the current outputs: AUROC of R 0.948 [0.914, 0.975], ρ(R, I) 0.726 [0.653, 0.785] |
 | 2026-10-24 | 98ecc16+ | Full pool, verify (S1) | full | pool 21,829 rows: 19,269 originals (6,145 FinQA, 13,124 TAT-QA), 1,000 negatives; 245 exclusions; 0 leakage removals; all originals verify; 225 negatives (span swaps) pass span verification | yes | pilot outputs snapshotted to `code/runs/pilot_2026-10-24/` (SHA256SUMS) before the full run |
 | 2026-10-24 | 98ecc16+ | Full q3 with real Qwen3-235B (parallel, 8 workers) | full | 20,255 checks (12,055 template, 8,200 LLM); 14 dropped (3 negatives); 8,196 calls, all DeepInfra, $0.76 | yes | two interruptions: OpenRouter 402 (no credit; owner topped up) and a dropped connection (now retried); cached responses reused on resume. Checks not human-validated (owner: run without) |
@@ -548,7 +550,7 @@ Real-data, GPU, API and human checks, recorded as they are run. One row per chec
 | 2026-10-25 | 98ecc16+ | Battery v1 pilot test (pre-recorded criteria C1–C4) | pilot | 899 requests sent; determinism 0.0157 ≤ 0.017, batched; C1 0.849 ✗, C2 0.748 ✗, C3 ✓, C4 0.951 ✓ → v1 **rejected**; full pool not re-scored | no | outputs in `code/runs/pilot_v1_2026-10-24/`; v0 snapshots verified intact by SHA256SUMS |
 | 2026-10-25 | 98ecc16+ | Battery v2 pilot test (pre-recorded criteria C1′–C4) | pilot | 1,167 requests sent (499 scoring: 299 judge-state + 200 answer-free, shared by originals and negatives); C1′ ✓, C2 0.582 ✗, C3 ✓, C4 0.965 ✓; ρ(R, I) 0.530 | no | full pool not re-scored; v0/v1 snapshots verified intact |
 | 2026-10-25 | 98ecc16+ | Full Jev run, battery v2 (primary) | full | 20,255 items × 6 questions; 39,905 requests sent (20,251 judge-state 4-question, 19,258 answer-free 2-question, 396 single), 42.5M input tokens ≈ $0.35; determinism 0.0121 → single; batching 0.0118 ≤ 0.0221 → batched; invariants pass | yes | outputs snapshotted to `code/runs/full_v2_2026-10-25/` (SHA256SUMS); live `code/scores/` now v2 |
-| 2026-10-25 | 98ecc16+ | Full-pool battery comparison v0 vs v2 (`notebooks/battery_versions_analysis.ipynb`, read-only) | full | ρ(R, I) 0.674 → 0.458 (FinQA 0.804 → 0.516; TAT-QA 0.560 → 0.356); ρ(Q1, Q2) 0.823 → 0.484; AUROC on negatives R 0.942 → 0.942, I 0.930 → 0.713, Q2 0.922 → 0.500; ρ(R v0, R v2) 0.967; top-20% I overlap 56–68% | — | v2 meets C2 on the full pool (0.48 < 0.50) though it missed it on the pilot (0.58); the exception stays disclosed |
+| 2026-10-25 | 98ecc16+ | Full-pool battery comparison v0 vs v2 (`notebooks/02_battery_versions_analysis.ipynb`, read-only) | full | ρ(R, I) 0.674 → 0.458 (FinQA 0.804 → 0.516; TAT-QA 0.560 → 0.356); ρ(Q1, Q2) 0.823 → 0.484; AUROC on negatives R 0.942 → 0.942, I 0.930 → 0.713, Q2 0.922 → 0.500; ρ(R v0, R v2) 0.967; top-20% I overlap 56–68% | — | v2 meets C2 on the full pool (0.48 < 0.50) though it missed it on the pilot (0.58); the exception stays disclosed |
 
 ## Owner decisions log
 

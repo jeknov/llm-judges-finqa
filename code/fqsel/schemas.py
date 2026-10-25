@@ -207,6 +207,68 @@ TABLES: dict[str, TableDef] = {
             "indecision_para": Col("float", unit_interval=True),
         },
     ),
+    "surprisal": TableDef(
+        "scores/surprisal.parquet",
+        {
+            "item_id": Col("str", nonempty=True),
+            "nll_sum": Col("float"),
+            "n_answer_tokens": Col("int"),
+            "nll_mean": Col("float"),
+            "S": Col("float", nullable=True, unit_interval=True),
+            "acc": Col("float", unit_interval=True),
+            "n_correct": Col("int"),
+            "n_unparsed": Col("int"),
+            "modal_answer": Col("str", nullable=True),
+            "modal_share": Col("float", unit_interval=True),
+            "boundary_adjusted": Col("bool"),
+        },
+    ),
+    "surprisal_samples": TableDef(
+        "scores/surprisal_samples.parquet",
+        {
+            "item_id": Col("str", nonempty=True),
+            "k": Col("int"),
+            "seed": Col("int"),
+            "text": Col("str"),
+            "answer": Col("str", nullable=True),
+            "correct": Col("bool"),
+        },
+        unique=("item_id", "k"),
+    ),
+    "sc_subsample": TableDef(
+        "data/sc_subsample.parquet",
+        {
+            "item_id": Col("str", nonempty=True),
+            "dataset": Col("str", isin=("finqa", "tatqa")),
+            "answer_type": Col("str", isin=("arith", "lookup")),
+            "r_quintile": Col("int"),
+        },
+    ),
+    "sc_samples": TableDef(
+        "scores/sc_samples.parquet",
+        {
+            "item_id": Col("str", nonempty=True),
+            "k": Col("int"),
+            "seed": Col("int"),
+            "answer": Col("str", nullable=True),
+            "correct": Col("bool"),
+            "text": Col("str"),
+        },
+        unique=("item_id", "k"),
+    ),
+    "self_consistency": TableDef(
+        "scores/self_consistency.parquet",
+        {
+            "item_id": Col("str", nonempty=True),
+            "n_samples": Col("int"),
+            "n_extracted": Col("int"),
+            "sc_acc": Col("float", unit_interval=True),
+            "sc_modal_share": Col("float", unit_interval=True),
+            "modal_answer": Col("str", nullable=True),
+            "modal_correct": Col("bool"),
+            "generator_model": Col("str"),
+        },
+    ),
     # Path is per task: annotation/<task>/labels.parquet (pass path= to write_table/read_table).
     "annotation_labels": TableDef(
         "annotation/{task}/labels.parquet",

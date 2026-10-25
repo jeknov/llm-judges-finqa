@@ -20,7 +20,8 @@ stages:
            results/jev_manifest.json]
   surprisal:
     cmd: python -m fqsel run surprisal profile=${profile}
-    deps: [data/pool.parquet]
+    deps: [fqsel/stages/surprisal.py, fqsel/nll.py, data/pool.parquet]
+    outs: [scores/surprisal.parquet, scores/surprisal_samples.parquet]
   comparators:
     cmd: python -m fqsel run comparators profile=${profile}
     deps: [data/pool.parquet]
