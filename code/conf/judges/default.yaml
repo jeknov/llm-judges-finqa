@@ -1,0 +1,49 @@
+# Judge comparison (owner decision 2026-10-25): the Jev battery asked of four open-weight LLM judges, two
+# sizes in each of two families, via OpenRouter. An exploratory extension of E0, not a pre-registered test.
+# Each judge is pinned to one provider endpoint in bf16, with no fallbacks, so every call runs on the same
+# deployment; P(yes) is read from the first answer token's log-probabilities (no GPU needed).
+endpoint: https://openrouter.ai/api/v1/chat/completions
+api_key_env: OPENROUTER_API_KEY
+prompt: judge_yesno.txt          # wraps one battery question around the rendered item (owner approval pending)
+temperature: 0.0
+max_tokens: 1                    # only the first answer token is read
+top_logprobs: 20                 # the most OpenRouter returns; yes/no variants are summed over these
+seed_label: judges               # request seed: stable_seed(global_seed, "judges")
+include_paraphrase: false        # true adds Q1', Q2' (v0, v1, v2) and Q3' at about twice the cost
+determinism:
+  n_items: 200                   # rescored once; the mean |dP| is reported, not used to change scoring
+timeout_s: 120
+max_workers: 8                   # parallel requests (operational, not an analysis parameter)
+retry:
+  max_attempts: 10
+  base_delay_s: 1.0
+  max_delay_s: 60.0
+models:
+  llama32_3b:
+    name: meta-llama/llama-3.2-3b-instruct       # OpenRouter model ID
+    weights: meta-llama/Llama-3.2-3B-Instruct    # Hugging Face repo of the weights served
+    family: llama
+    provider: {order: [parasail/bf16], quantizations: [bf16], allow_fallbacks: false, require_parameters: true}
+    expected_provider: Parasail
+    reasoning: null              # null: the model has no reasoning mode, so nothing is sent
+  llama33_70b:
+    name: meta-llama/llama-3.3-70b-instruct
+    weights: meta-llama/Llama-3.3-70B-Instruct
+    family: llama
+    provider: {order: [novita/bf16], quantizations: [bf16], allow_fallbacks: false, require_parameters: true}
+    expected_provider: Novita
+    reasoning: null
+  gemma3_4b:
+    name: google/gemma-3-4b-it
+    weights: google/gemma-3-4b-it
+    family: gemma
+    provider: {order: [parasail/bf16], quantizations: [bf16], allow_fallbacks: false, require_parameters: true}
+    expected_provider: Parasail
+    reasoning: null
+  gemma4_31b:
+    name: google/gemma-4-31b-it
+    weights: google/gemma-4-31B-it
+    family: gemma
+    provider: {order: [novita/bf16], quantizations: [bf16], allow_fallbacks: false, require_parameters: true}
+    expected_provider: Novita
+    reasoning: false             # the endpoint supports reasoning; it is switched off so the answer comes first

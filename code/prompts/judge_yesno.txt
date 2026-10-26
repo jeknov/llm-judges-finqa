@@ -1,0 +1,10 @@
+# STATUS: FINAL
+# Judge comparison: the wrapper that asks an OpenRouter judge one Jev battery question. {state} is
+# render_item's `judge` view (context, question, stated answer), or its `qa` view for answer-free questions;
+# {question} is one battery question, verbatim from prompts/jev_battery_<version>.yaml. The judge's first
+# answer token is read, so the reply must open with yes or no. 
+{state}
+
+Answer the following question about the item above.
+{question}
+Reply with one word: yes or no.

@@ -269,6 +269,50 @@ TABLES: dict[str, TableDef] = {
             "generator_model": Col("str"),
         },
     ),
+    # Judge comparison: path is per judge, scores/judges/<judge>_long.parquet (pass path=). One row per item
+    # and question; `variant` is the battery version of Q2 (v0, v1, v2) and "all" for Q1 and Q3, whose
+    # wording every version shares. p_yes is None when neither yes nor no is among the top tokens.
+    "judge_scores_long": TableDef(
+        "scores/judges/{judge}_long.parquet",
+        {
+            "item_id": Col("str", nonempty=True),
+            "judge": Col("str", nonempty=True),
+            "battery": Col("str", isin=("orig", "para")),
+            "question": Col("str", isin=("q1", "q2", "q3")),
+            "variant": Col("str", isin=("v0", "v1", "v2", "all")),
+            "state": Col("str", isin=("judge", "qa")),
+            "p_yes": Col("float", nullable=True, unit_interval=True),
+            "mass": Col("float"),
+            "top_token": Col("str"),
+            "provider": Col("str", nonempty=True),
+            "served_model": Col("str", nonempty=True),
+            "request_id": Col("str", nonempty=True),
+            "input_tokens": Col("int"),
+            "cost": Col("float", nullable=True),
+            "timestamp": Col("str"),
+        },
+        unique=("item_id", "battery", "question", "variant"),
+    ),
+    # Path is per judge, scores/judges/<judge>.parquet. Original battery only; R = Q1, I_<v> = mean(Q2_<v>, Q3).
+    "judge_scores": TableDef(
+        "scores/judges/{judge}.parquet",
+        {
+            "item_id": Col("str", nonempty=True),
+            "judge": Col("str", nonempty=True),
+            "is_negative": Col("bool"),
+            "base_item_id": Col("str", nonempty=True),
+            "R": Col("float", nullable=True, unit_interval=True),
+            "Q2_v0": Col("float", nullable=True, unit_interval=True),
+            "Q2_v1": Col("float", nullable=True, unit_interval=True),
+            "Q2_v2": Col("float", nullable=True, unit_interval=True),
+            "Q3": Col("float", nullable=True, unit_interval=True),
+            "I_v0": Col("float", nullable=True, unit_interval=True),
+            "I_v1": Col("float", nullable=True, unit_interval=True),
+            "I_v2": Col("float", nullable=True, unit_interval=True),
+            "min_mass": Col("float"),
+        },
+        unique=("item_id",),
+    ),
     # Path is per task: annotation/<task>/labels.parquet (pass path= to write_table/read_table).
     "annotation_labels": TableDef(
         "annotation/{task}/labels.parquet",

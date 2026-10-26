@@ -8,6 +8,7 @@ backend: vllm
 clients:
   jev: real
   strong: real
+  judges: real
 
 data:
   sizes:

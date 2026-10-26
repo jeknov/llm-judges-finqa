@@ -33,6 +33,8 @@ This brief is the entry point for implementing the study in code. It summarizes 
 
 **Running:** Spec 3's self-consistency comparator on Qwen (3,000 items × 5 samples; about 7 hours; about $2.50).
 
+**Added, exploratory:** a judge comparison (`python -m fqsel judges`). The Jev battery (Q1, Q3, and Q2 in its v0, v1 and v2 wordings) is asked of Llama 3.2 3B, Llama 3.3 70B, Gemma 3 4B and Gemma 4 31B through OpenRouter, each pinned to one bf16 endpoint, on the 995 A1 pairs. P(yes) comes from first-token log-probabilities. Code and tests are done, and the wrapper prompt (P9) is approved; the real run has not started. It is outside the pre-registered design.
+
 **Notebooks:**
 - `notebooks/00_data_analysis.ipynb`: the data, pilot versus full run.
 - `notebooks/01_pilot_jev_analysis.ipynb`: the pilot Jev run.

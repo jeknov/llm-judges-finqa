@@ -9,6 +9,7 @@ backend: hf
 clients:
   jev: mock
   strong: mock
+  judges: mock
 
 data:
   sizes:
@@ -27,3 +28,7 @@ surprisal:
 jev:
   determinism:
     n_items: 10                   # TEST-ONLY (spec: 200)
+
+judges:
+  determinism:
+    n_items: 10                   # TEST-ONLY (judges config: 200)

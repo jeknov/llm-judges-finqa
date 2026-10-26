@@ -213,6 +213,25 @@ None of these alters a pre-registered threshold or hypothesis rule. All are owne
   - Q3 LLM-fallback prompt wording (P4): drafted by Claude, approved by the owner on 24 October 2026 and frozen (`code/prompts/q3_fallback.txt`).
 - **Still open:** judge-quality prompt (P3) and top-20% rounding (P8). LoRA and projection seeds (P1) are set: LoRA 20261024, projection 10242026.
 
+## Judge comparison (exploratory, added 25 October 2026)
+
+To test whether the answer leakage found with Jev depends on the judge and its size, the Jev battery is also asked of four open-weight LLM judges through OpenRouter, with no GPU needed. Each judge answers Q1, Q3 and Q2 in its v0, v1 and v2 wordings on the 995 original/negative pairs (8,955 requests per judge), and P(yes) comes from the first answer token's log-probabilities. The command is `python -m fqsel judges` (`--judge <key>` to pick judges, `--smoke N` for a no-output check), configured in `code/conf/judges/default.yaml`. It is outside the pre-registered pipeline: no gate or hypothesis reads it. The wrapper prompt `code/prompts/judge_yesno.txt` (P9) was approved on 25 October 2026.
+
+**Providers and precision as run (owner decisions, 25 October 2026).** The plan pinned every judge to a bf16 endpoint: Parasail for the two small models, Novita for the two large ones. Novita's shared upstream pool rate-limited every request for Gemma 4 31B for over an hour, so the owner moved Gemma 4 31B to Parasail. The owner also chose to run both Llama models side by side on Parasail, which moved Llama 3.3 70B there too; Novita was never tried for it. Parasail serves both large models only in fp8. The configuration file still names the planned endpoints; the switch is made per run with command-line overrides, and each run's manifest (`results/judges/<judge>_manifest.json`) records the endpoint actually used.
+
+| Judge | Planned endpoint | Endpoint as run | Precision as run | Status (25 Oct, 23:30 UTC) |
+| --- | --- | --- | --- | --- |
+| Gemma 3 4B | Parasail, bf16 | Parasail | bf16 | **done**: core and paraphrases ($0.35) |
+| Gemma 4 31B | Novita, bf16 | **Parasail** | **fp8** | core and paraphrases running |
+| Llama 3.2 3B | Parasail, bf16 | Parasail | bf16 | **core done** ($0.31) |
+| Llama 3.3 70B | Novita, bf16 | **Parasail** | **fp8** | **core done** ($0.81; paraphrases not planned yet) |
+
+**Consequence for the analysis.** Within each family, the larger judge is also the lower-precision one, so a size effect cannot be separated from a precision effect. The two families share the same pattern (small in bf16, large in fp8) and the same provider, which keeps the comparison across families at matched size clean, and keeps provider out of the comparison altogether. The Gemma pair also spans two model generations (Gemma 3 and Gemma 4). Comparisons across judges use AUROCs and rank correlations only, not P(yes) levels.
+
+**Paper-ready sentence.**
+
+> All four judges were served by the same provider (Parasail, via OpenRouter, with no fallback routing): the two small judges (Llama 3.2 3B Instruct, Gemma 3 4B) in bf16, and the two large judges (Llama 3.3 70B Instruct, Gemma 4 31B) in fp8, the only precision in which that provider serves them (the bf16 endpoint we had planned for Gemma 4 31B was persistently rate-limited, and we kept all four judges on one provider); within each family, judge size is therefore confounded with numerical precision, and we compare judges only by rank-based measures (AUROC, Spearman correlation).
+
 ## Blockers and next steps
 
 **Blockers:**
@@ -230,5 +249,6 @@ None of these alters a pre-registered threshold or hypothesis rule. All are owne
 
 **Next:**
 - **When self-consistency finishes:** record it.
+- **Judge comparison:** finish the four runs (see the table above), add Llama paraphrases if wanted, then analyse leakage by judge.
 - **Milestone 4's full run:** on the GPU node.
 - **Then milestone 5:** the remaining comparators, E0, the H1 verdict and gates D1–D4. These are the first scientific results.

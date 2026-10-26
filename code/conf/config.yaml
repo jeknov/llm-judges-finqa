@@ -4,6 +4,7 @@ defaults:
   - data: default
   - jev: default
   - strong@model.strong: default
+  - judges: default
   - annotation: default
   - proxy: influence
   - stats: default

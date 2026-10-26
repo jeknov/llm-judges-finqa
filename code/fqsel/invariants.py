@@ -49,6 +49,13 @@ def run_checks(cfg: DictConfig) -> list[str]:
             tables[name] = read_table(name, cfg)
         except Exception as e:  # noqa: BLE001 - report every failure, do not stop at the first
             problems.append(f"{name}: schema validation failed: {e}")
+    judges_dir = table_path(cfg, "pool", "scores/judges")
+    for path in sorted(judges_dir.glob("*.parquet")) if judges_dir.exists() else []:
+        name = "judge_scores_long" if path.stem.endswith("_long") else "judge_scores"
+        try:
+            read_table(name, cfg, path=path)
+        except Exception as e:  # noqa: BLE001
+            problems.append(f"{path.name}: schema validation failed: {e}")
 
     pool = tables.get("pool")
     if pool is not None:

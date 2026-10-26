@@ -10,12 +10,9 @@ Every response's provider is checked against the pinned one and logged with its 
 
 from __future__ import annotations
 
-import http.client
 import json
 import os
 import threading
-import urllib.error
-import urllib.request
 from collections.abc import Callable
 from pathlib import Path
 from typing import Protocol
@@ -24,7 +21,8 @@ import jsonschema
 from omegaconf import DictConfig, OmegaConf
 
 from fqsel.clients.cache import JsonCache, cache_key
-from fqsel.clients.retry import RateLimited, TransientError, with_retries
+from fqsel.clients.openrouter import ProviderMismatch, post_chat
+from fqsel.clients.retry import with_retries
 from fqsel.config import cache_dir
 from fqsel.ids import stable_seed
 from fqsel.prompts import single_user_message
@@ -80,10 +78,6 @@ class MockStrongLLM:
         return f"Reasoning briefly.\nAnswer: {stable_seed('mockstrong-text', prompt, seed) % 100}"
 
 
-class ProviderMismatch(RuntimeError):
-    """A response came from a provider other than the pinned one."""
-
-
 class RealStrongLLM:
     """OpenRouter chat-completions client for model.strong, pinned to one provider endpoint."""
 
@@ -121,21 +115,7 @@ class RealStrongLLM:
         return body
 
     def _post(self, body: dict) -> dict:
-        req = urllib.request.Request(self.endpoint, data=json.dumps(body).encode(), method="POST", headers={
-            "Content-Type": "application/json", "Authorization": f"Bearer {self.key}"})
-        try:
-            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
-                return json.loads(resp.read())
-        except urllib.error.HTTPError as e:
-            if e.code == 429:
-                ra = e.headers.get("retry-after")
-                raise RateLimited(float(ra) if ra else None) from e
-            if e.code >= 500:
-                raise TransientError(f"HTTP {e.code}") from e
-            raise
-        except (urllib.error.URLError, TimeoutError, ConnectionError, http.client.HTTPException) as e:
-            # includes a connection dropped mid-response (http.client.IncompleteRead)
-            raise TransientError(str(e)) from e
+        return post_chat(self.endpoint, self.key, body, self.timeout)
 
     def generate_json(self, prompt: str, schema: dict, temperature: float, seed: int) -> dict:
         return json.loads(self._complete(self.request_body(prompt, temperature, seed, schema=schema)))

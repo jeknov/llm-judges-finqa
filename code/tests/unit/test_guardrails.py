@@ -111,15 +111,35 @@ def test_no_placeholders_for_real_runs(profile):
 
 def test_spec1_stages_ignore_only_later_decisions():
     """Spec 1 stages may run before P1/P3/P8 are decided, but never skip their own sections."""
-    from fqsel.stages import get_stage
+    from fqsel.stages import JUDGES_SCOPE, get_stage
 
     for name in ("pool", "verify", "q3", "jev"):
         ignores = set(get_stage(name).ignores)
         assert {"proxy", "stats", "judge_quality.txt"} <= ignores
         assert not ignores & {"data", "model", "q3_fallback.txt", "jev_battery_v0.yaml", "jev_battery_v1.yaml"}
     assert "jev" not in get_stage("jev").ignores
-    assert set(get_stage("surprisal").ignores) == {"proxy", "stats", "judge_quality.txt", "jev"}  # Spec 2 needs only the pool
-    assert all(not s.ignores for s in STAGES if s.spec > 2)
+    # Spec 2 needs only the pool
+    assert set(get_stage("surprisal").ignores) == {"proxy", "stats", "judge_quality.txt", "jev", *JUDGES_SCOPE}
+    # no pipeline stage reads the judge comparison's settings, and Specs 3-6 skip nothing else
+    assert all(set(JUDGES_SCOPE) <= set(s.ignores) for s in STAGES)
+    assert all(s.ignores == JUDGES_SCOPE for s in STAGES if s.spec > 2)
+
+
+def test_judges_command_refuses_its_own_draft_prompt_except_for_a_smoke_test(monkeypatch):
+    """(added) `judges` reads Spec 1 outputs and its own settings; only --smoke may use a DRAFT wrapper."""
+    from fqsel import cli
+    from fqsel.stages import get_stage
+
+    seen = []
+    monkeypatch.setattr(cli, "load_config", lambda overrides, ignore=(): seen.append(tuple(ignore)) and None)
+    monkeypatch.setattr("fqsel.comparators.judges.run", lambda cfg, names: None)
+    monkeypatch.setattr("fqsel.comparators.judges.smoke", lambda cfg, name, n: None)
+    for argv in (["judges", "--judge", "x"], ["judges", "--judge", "x", "--smoke", "2"]):
+        assert cli.main(argv) == 0
+    full, smoke = seen
+    assert "judges" not in full and "judge_yesno.txt" not in full
+    assert set(full) == set(get_stage("jev").ignores) - {"judges", "judge_yesno.txt"}
+    assert smoke == (*full, "judge_yesno.txt")
 
 
 def test_jev_stage_loads_for_real_runs_but_refuses_its_own_placeholders():

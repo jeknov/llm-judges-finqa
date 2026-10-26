@@ -1,1 +1,1 @@
-"""Spec 3 comparator scores. Implemented so far: self-consistency (needs no GPU)."""
+"""Comparator scores. Spec 3: self-consistency (needs no GPU). Exploratory: the judge comparison (`judges`)."""

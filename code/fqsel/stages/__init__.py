@@ -27,24 +27,26 @@ class Stage:
 
 # Spec 1 stages run before the proxies (P1), the statistics (P8) and the judge (P3) are needed.
 _EARLY = ("proxy", "stats", "judge_quality.txt")
+# The judge comparison (python -m fqsel judges) is outside the pipeline; no stage reads its settings.
+JUDGES_SCOPE = ("judges", "judge_yesno.txt")
 
 
 STAGES: list[Stage] = [
-    Stage("pool", 1, "M2", "pool", ignores=(*_EARLY, "jev")),
-    Stage("verify", 1, "M2", "verify", ignores=(*_EARLY, "jev")),
-    Stage("q3", 1, "M2", "q3", ignores=(*_EARLY, "jev")),
-    Stage("jev", 1, "M3", "jev", ignores=_EARLY),
-    Stage("surprisal", 2, "M4", "surprisal", ignores=(*_EARLY, "jev")),
-    Stage("comparators", 3, "M5"),
-    Stage("e0", 3, "M5"),
-    Stage("gates", 3, "M5"),
-    Stage("frame", 3, "M5"),
-    Stage("influence", 4, "M6"),
-    Stage("icl", 4, "M6", gated=True),
-    Stage("e1", 5, "M7", gated=True),
-    Stage("e2", 5, "M7", gated=True),
-    Stage("e3", 6, "M8", gated=True, spec6_gate=True),
-    Stage("figures", 5, "M7"),
+    Stage("pool", 1, "M2", "pool", ignores=(*_EARLY, "jev", *JUDGES_SCOPE)),
+    Stage("verify", 1, "M2", "verify", ignores=(*_EARLY, "jev", *JUDGES_SCOPE)),
+    Stage("q3", 1, "M2", "q3", ignores=(*_EARLY, "jev", *JUDGES_SCOPE)),
+    Stage("jev", 1, "M3", "jev", ignores=(*_EARLY, *JUDGES_SCOPE)),
+    Stage("surprisal", 2, "M4", "surprisal", ignores=(*_EARLY, "jev", *JUDGES_SCOPE)),
+    Stage("comparators", 3, "M5", ignores=JUDGES_SCOPE),
+    Stage("e0", 3, "M5", ignores=JUDGES_SCOPE),
+    Stage("gates", 3, "M5", ignores=JUDGES_SCOPE),
+    Stage("frame", 3, "M5", ignores=JUDGES_SCOPE),
+    Stage("influence", 4, "M6", ignores=JUDGES_SCOPE),
+    Stage("icl", 4, "M6", gated=True, ignores=JUDGES_SCOPE),
+    Stage("e1", 5, "M7", gated=True, ignores=JUDGES_SCOPE),
+    Stage("e2", 5, "M7", gated=True, ignores=JUDGES_SCOPE),
+    Stage("e3", 6, "M8", gated=True, spec6_gate=True, ignores=JUDGES_SCOPE),
+    Stage("figures", 5, "M7", ignores=JUDGES_SCOPE),
 ]
 STAGE_NAMES = [s.name for s in STAGES]
 
