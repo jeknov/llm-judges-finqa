@@ -10,6 +10,7 @@ __pycache__/
 !.cache/jev.dvc
 !.cache/strong.dvc
 !.cache/logs.dvc
+!.cache/judges.dvc
 !.cache/.gitignore
 
 # Pipeline outputs are tracked by DVC, not git (Spec 1, Determinism)

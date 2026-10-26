@@ -1,0 +1,6 @@
+outs:
+- md5: fe30e43b5d2d61202b0b5ef335397110.dir
+  size: 17188371
+  nfiles: 59652
+  hash: md5
+  path: judges

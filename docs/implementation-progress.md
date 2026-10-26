@@ -219,12 +219,12 @@ To test whether the answer leakage found with Jev depends on the judge and its s
 
 **Providers and precision as run (owner decisions, 25 October 2026).** The plan pinned every judge to a bf16 endpoint: Parasail for the two small models, Novita for the two large ones. Novita's shared upstream pool rate-limited every request for Gemma 4 31B for over an hour, so the owner moved Gemma 4 31B to Parasail. The owner also chose to run both Llama models side by side on Parasail, which moved Llama 3.3 70B there too; Novita was never tried for it. Parasail serves both large models only in fp8. The configuration file still names the planned endpoints; the switch is made per run with command-line overrides, and each run's manifest (`results/judges/<judge>_manifest.json`) records the endpoint actually used.
 
-| Judge | Planned endpoint | Endpoint as run | Precision as run | Status (25 Oct, 23:30 UTC) |
+| Judge | Planned endpoint | Endpoint as run | Precision as run | Status (26 Oct, 03:30 UTC) |
 | --- | --- | --- | --- | --- |
 | Gemma 3 4B | Parasail, bf16 | Parasail | bf16 | **done**: core and paraphrases ($0.35) |
-| Gemma 4 31B | Novita, bf16 | **Parasail** | **fp8** | core and paraphrases running |
-| Llama 3.2 3B | Parasail, bf16 | Parasail | bf16 | **core done** ($0.31) |
-| Llama 3.3 70B | Novita, bf16 | **Parasail** | **fp8** | **core done** ($0.81; paraphrases not planned yet) |
+| Gemma 4 31B | Novita, bf16 | **Parasail** | **fp8** | **done**: core and paraphrases ($1.29) |
+| Llama 3.2 3B | Parasail, bf16 | Parasail | bf16 | **done**: core ($0.31); paraphrases not run |
+| Llama 3.3 70B | Novita, bf16 | **Parasail** | **fp8** | **done**: core ($0.81); paraphrases not run |
 
 **Consequence for the analysis.** Within each family, the larger judge is also the lower-precision one, so a size effect cannot be separated from a precision effect. The two families share the same pattern (small in bf16, large in fp8) and the same provider, which keeps the comparison across families at matched size clean, and keeps provider out of the comparison altogether. The Gemma pair also spans two model generations (Gemma 3 and Gemma 4). Comparisons across judges use AUROCs and rank correlations only, not P(yes) levels.
 
@@ -249,6 +249,6 @@ To test whether the answer leakage found with Jev depends on the judge and its s
 
 **Next:**
 - **When self-consistency finishes:** record it.
-- **Judge comparison:** finish the four runs (see the table above), add Llama paraphrases if wanted, then analyse leakage by judge.
+- **Judge comparison:** all four runs are done and archived (`code/runs/judges_2026-10-26/`); add Llama paraphrases if wanted, then analyse leakage by judge in a notebook.
 - **Milestone 4's full run:** on the GPU node.
 - **Then milestone 5:** the remaining comparators, E0, the H1 verdict and gates D1–D4. These are the first scientific results.
