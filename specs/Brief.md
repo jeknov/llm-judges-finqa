@@ -39,6 +39,7 @@ This brief is the entry point for implementing the study in code. It summarizes 
 - `notebooks/00_data_analysis.ipynb`: the data, pilot versus full run.
 - `notebooks/01_pilot_jev_analysis.ipynb`: the pilot Jev run.
 - `notebooks/02_battery_versions_analysis.ipynb`: the battery decision and the v0, v1, v2 and Q3-only comparison.
+- `notebooks/04_judge_comparison_analysis.ipynb`: the judge comparison (four open-weight judges and Jev on the A1 pairs).
 
 **No scientific measurement exists yet:** no experiment, hypothesis verdict or gate outcome.
 

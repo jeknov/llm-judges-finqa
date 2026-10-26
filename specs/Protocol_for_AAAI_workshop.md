@@ -119,7 +119,7 @@ Points the paper adds to the CBI literature:
 - **Selection comparison (descriptive).** The unanimity filter keeps every CBI item. On FinQA, top-20% R keeps only 6.4% of CBI items, against the 20% a random selection would keep in expectation. On TAT-QA, R alone does not help, and top-20% V = R × I works best (10.4% of CBI kept).
 - **Scoring cross-check:** Jev rates answers that exact match rejects but numeric or near-verbatim matching accepts the same as correct answers (median 0.98). This independently supports counting them as correct.
 
-### 6. Judge comparison: four open-weight judges by family and size — done (analysis to do)
+### 6. Judge comparison: four open-weight judges by family and size — done (analysis: notebook 04)
 
 - **Purpose:** RQ3, and an answer to the objection that the leakage finding is specific to one commercial judge.
 - **Judges.** All four were served by one provider (Parasail, via OpenRouter, no fallbacks). The small judges ran in bf16; the large judges in fp8, the only precision Parasail serves them in. Gemma 4 31B moved from its planned Novita bf16 endpoint because Novita rate-limited every request; Llama 3.3 70B moved so that both Llama judges ran side by side on one provider (owner decisions; see the implementation-progress document):
@@ -129,7 +129,7 @@ Points the paper adds to the CBI literature:
   | Llama | Llama 3.2 3B Instruct — core done | Llama 3.3 70B Instruct — core done |
   | Gemma | Gemma 3 4B — core and paraphrases done | Gemma 4 31B (reasoning off) — core and paraphrases done |
 
-- **Preliminary results** (informal, outside the analysis code). In both families the large judge detects wrong answers better (AUROC of R: Llama 0.69 → 0.88, Gemma 0.71 → 0.89, Jev 0.94), and its determinacy question under v0 leaks almost as much as its support question detects (Q2 AUROC: Llama 0.61 → 0.86, Gemma 0.66 → 0.89, Jev 0.92). Rewording (v1) helps little; hiding the answer (v2) gives 0.50 for every judge and lowers ρ(Q1, Q2) to 0.47–0.54. Within each family, size is confounded with precision (and, for Gemma, with model generation).
+- **Results** (`notebooks/04_judge_comparison_analysis.ipynb`, pair-clustered bootstrap and Fisher-z intervals). In both families the large judge detects wrong answers better (AUROC of R: Llama 0.69 → 0.88, Gemma 0.71 → 0.89, Jev 0.94), and its determinacy question under v0 leaks almost as much as its support question detects (Q2 AUROC: Llama 0.61 → 0.86, Gemma 0.66 → 0.89, Jev 0.92). Relative to each judge's own correctness signal, Q2 under v0 reproduces 61% and 77% of it for the small judges and 94–99% for the large judges and Jev. Rewording (v1) helps little; hiding the answer (v2) gives 0.50 for every judge and lowers ρ(Q1, Q2) from 0.70–0.85 to 0.47–0.61. Small judges are near chance on arithmetic items (AUROC of R 0.52–0.55); capable judges agree on answer-free determinacy (ρ with Jev 0.67–0.79). Within each family, size is confounded with precision (and, for Gemma, with model generation).
 
 - **Items and questions.** The 995 original/negative pairs (1,990 items) from Experiment 2's analysis A1. Each item gets Q1, Q3 and Q2 in its v0, v1 and v2 wordings, verbatim from the frozen batteries. Paraphrases (Q1′, Q2′ ×3, Q3′) are planned for the Gemma pair and can be added later from the cache with identical results. That's 8,955 requests per judge for the core questions, about 10.8M input tokens.
 - **Score.** P(yes) comes from first-token log-probabilities: yes/no variants are summed and renormalised, and the yes/no mass is kept as a format check. A 200-item determinism check is run per judge.
@@ -146,7 +146,7 @@ Points the paper adds to the CBI literature:
   - the large models differ in size across families (70B vs 31B);
   - every judge is a general-purpose instruct model scored by log-probabilities, while Jev is a decision-only judge;
   - P(yes) levels are not calibrated across judges, so only AUROCs and rank correlations are compared.
-- **Cost (actual):** $3.25 in total: Gemma 3 4B $0.35 and Gemma 4 31B $1.29 with paraphrases; Llama 3.2 3B $0.31 and Llama 3.3 70B $0.81, core only.
+- **Cost (actual):** $2.76 in total: Gemma 3 4B $0.35 and Gemma 4 31B $1.29 with paraphrases; Llama 3.2 3B $0.31 and Llama 3.3 70B $0.81, core only.
 
 ### 7. Judges from other families on Qwen's answers — proposed
 
