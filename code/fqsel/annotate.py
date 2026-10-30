@@ -61,6 +61,13 @@ def export_sheets(task: str, items: pd.DataFrame, cfg: DictConfig,
     if missing:
         raise AnnotationError(f"items lack columns {missing}")
     out_dir = task_dir(cfg, task)
+    for annotator in cfg.annotation.annotators:   # never overwrite labels an annotator has already entered
+        sheet = out_dir / f"{annotator}.csv"
+        if sheet.exists():
+            existing = _read_csv(sheet)
+            filled = [c for c in [*label_cols, "note"] if c in existing and existing[c].str.strip().ne("").any()]
+            if filled:
+                raise AnnotationError(f"{sheet} already has entries in {filled}; move it away before re-exporting")
     out_dir.mkdir(parents=True, exist_ok=True)
     rows = []
     for _, it in items.sort_values("item_id").iterrows():

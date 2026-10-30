@@ -1,5 +1,5 @@
 """Command line: python -m fqsel {run <stage> | check | annotate export|import <task> | self-consistency |
-judges [--judge NAME]... [--smoke N_PAIRS]} [hydra overrides]."""
+judges [--judge NAME]... [--smoke N_PAIRS] | judges-cbi [--judge NAME]... [--smoke N_ITEMS]} [hydra overrides]."""
 
 from __future__ import annotations
 
@@ -29,17 +29,26 @@ def main(argv: list[str] | None = None) -> int:
                           help="Spec 3 comparator sc_acc/sc_modal_share on the 3,000-item subsample (strong LLM only)")
     p_sc.add_argument("overrides", nargs="*")
     p_j = sub.add_parser("judges", help="judge comparison: the Jev battery asked of the OpenRouter judges (conf/judges)")
-    p_j.add_argument("--judge", action="append", help="judge key in conf/judges (repeatable); default: all")
+    p_j.add_argument("--judge", action="append", help="judge key in conf/judges (repeatable); default: judges.comparison")
     p_j.add_argument("--smoke", type=int, metavar="N_PAIRS",
                      help="score N_PAIRS originals and their negatives, print the answers, write no table")
     p_j.add_argument("overrides", nargs="*")
+    p_jc = sub.add_parser("judges-cbi", help="CBI replication: judges score the gold and the strong model's answer "
+                                             "on notebook 03's unanimous items (conf/judges, cbi)")
+    p_jc.add_argument("--judge", action="append", help="judge key in conf/judges (repeatable); default: judges.cbi.judges")
+    p_jc.add_argument("--smoke", type=int, metavar="N_ITEMS",
+                      help="score N_ITEMS unanimous items (half CBI), print the answers, write no table")
+    p_jc.add_argument("overrides", nargs="*")
     args = parser.parse_args(argv)
 
     # a command skips only the placeholders of the stage whose data it reads; annotation tasks are all Q3's,
     # and self-consistency reads only Spec 1 outputs and the strong-LLM settings, like the jev stage
     stage = {"run": getattr(args, "stage", None), "annotate": "q3", "self-consistency": "jev",
-             "judges": "jev"}.get(args.command)
+             "judges": "jev", "judges-cbi": "jev"}.get(args.command)
     ignore = get_stage(stage).ignores if stage else ()
+    if args.command == "judges-cbi":
+        # reads the frozen snapshots, the judge settings and the CBI definition (annotation config); FINAL prompt only
+        ignore = tuple(i for i in ignore if i not in JUDGES_SCOPE)
     if args.command == "judges":
         # the judges read Spec 1 outputs and their own settings; a smoke test may use the DRAFT wrapper prompt
         ignore = tuple(i for i in ignore if i not in JUDGES_SCOPE) + (("judge_yesno.txt",) if args.smoke else ())
@@ -66,13 +75,25 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "judges":
         from fqsel.comparators import judges
 
-        names = args.judge or list(cfg.judges.models)
+        names = args.judge or list(cfg.judges.comparison)
         if args.smoke:
             with pd.option_context("display.width", 200, "display.max_columns", None, "display.max_rows", None):
                 for name in names:
                     print(f"== {name}\n{judges.smoke(cfg, name, args.smoke)}")
             return 0
         judges.run(cfg, names)
+        return 0
+    if args.command == "judges-cbi":
+        from fqsel.comparators import judges_cbi
+
+        names = args.judge or list(cfg.judges.cbi.judges)
+        if args.smoke:
+            with pd.option_context("display.width", 220, "display.max_columns", None, "display.max_rows", None,
+                                   "display.max_colwidth", 30):
+                for name in names:
+                    print(f"== {name}\n{judges_cbi.smoke(cfg, name, args.smoke)}")
+            return 0
+        judges_cbi.run(cfg, names)
         return 0
     if args.task == "cbi_audit":
         from fqsel import cbi_audit

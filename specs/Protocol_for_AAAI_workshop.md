@@ -148,9 +148,9 @@ Points the paper adds to the CBI literature:
   - P(yes) levels are not calibrated across judges, so only AUROCs and rank correlations are compared.
 - **Cost (actual):** $2.76 in total: Gemma 3 4B $0.35 and Gemma 4 31B $1.29 with paraphrases; Llama 3.2 3B $0.31 and Llama 3.3 70B $0.81, core only.
 
-### 7. Judges from other families on Qwen's answers — proposed
+### 7. Judges from other families on Qwen's answers — ready to run (code done; owner-approved 29 Oct)
 
-The notebook's main limitation for Experiment 5 is that Jev may be built on a Qwen model (still unanswered by TypeSafe). If so, generator–judge convergence is partly shared training. Repeating Experiment 5's "judging Qwen's answer" arm with the Llama and Gemma judges from Experiment 6 separates the two explanations at negligible cost: about 6,000 requests per judge, Q1 and Q1′ on 2,996 modal answers. **Not yet approved; it needs a pre-specified design, as Experiment 5 had.**
+The notebook's main limitation for Experiment 5 is that Jev may be built on a Qwen model (still unanswered by TypeSafe). If so, generator–judge convergence is partly shared training. Three open-weight judges repeat Experiment 5 on the same items: **Qwen3-30B-A3B** (same family as the generator, as a control; DekaLLM, precision not reported), **Gemma 4 31B** and **Llama 3.3 70B** (Parasail fp8). Each judge scores both the gold answer (Q1, Q2 v2, Q3) and Qwen's modal answer (Q1) on notebook 03's 1,730 unanimous items (281 CBI), in one run on one endpoint (`python -m fqsel judges-cbi`). Primary metrics: per judge, the AUROC of judging the model's answer and of judging the gold for reliable vs CBI, and their paired difference; secondary: the joint verdict table, overlap with Jev's 90 "sides with Qwen" items, and whether the Qwen judge endorses Qwen's errors more than the others. Pre-specified in the implementation plan before any score. Estimated cost about $2.
 
 ### 8. Human validation and audit — to do (no GPU; annotators needed)
 
@@ -225,7 +225,7 @@ These need the GPU: surprisal (Spec 2), base-model accuracy and gate D2, the PVI
 - [ ] Answer matcher for every accuracy (blocking question 5): exact + numeric as primary, token-F1 as robustness?
 - [ ] CBI consistency definition: the CBI paper's (unanimity at n = 5) as primary, 4 of 5 as sensitivity?
 - [ ] Paraphrases for the Llama pair (about $1.10)?
-- [ ] Experiment 7 (non-Qwen judges on Qwen's answers): approve and pre-specify the design?
+- [x] Experiment 7: approved and pre-specified (29 Oct); run pending
 - [ ] Annotators for the Q3 validation and the CBI audit.
 - [ ] Workshop venue, page limit and deadline: check the AAAI-27 workshop calls.
 - [ ] Questions for TypeSafe: Jev's base model; how long `jev-1.14.0` stays available.

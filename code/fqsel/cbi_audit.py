@@ -97,8 +97,10 @@ def _snap(cfg: DictConfig, key: str):
     return root_dir(cfg) / "runs" / cfg.annotation.tasks[TASK].snapshots[key]
 
 
-def cbi_items(cfg: DictConfig) -> pd.DataFrame:
-    """Every CBI item with its verdict cell, gold and model answers, and the model's first reasoning sample."""
+def unanimous_items(cfg: DictConfig) -> pd.DataFrame:
+    """Every item the strong model answers unanimously (notebook 03's 1,730), with `cbi` marking the
+    confident errors, Jev's verdict cell, the gold and model answers, and the model's first reasoning
+    sample. The judge CBI replication (fqsel.comparators.judges_cbi) scores exactly these items."""
     spec = cfg.annotation.tasks[TASK]
     pool = pd.read_parquet(_snap(cfg, "pool_and_jev") / "data" / "pool.parquet").set_index("item_id")
     r = pd.read_parquet(_snap(cfg, "pool_and_jev") / "scores" / "jev_scores.parquet").set_index("item_id")["R"]
@@ -112,12 +114,19 @@ def cbi_items(cfg: DictConfig) -> pd.DataFrame:
                       "acc_num": g["c_num"].mean(), "model_reasoning": g["text"].first()})
     t = t.join(jq[["p_q1", "stated_answer"]], how="inner").join(r)
     t = t[t["p_q1"].notna()]
-    cbi = t[(t["consistency"] >= float(spec.consistency_threshold)) & (t["acc_num"] < float(spec.wrong_below))].copy()
+    una = t[t["consistency"] >= float(spec.consistency_threshold)].copy()
+    una["cbi"] = una["acc_num"] < float(spec.wrong_below)
     sup = float(spec.supported_threshold)
-    gold_ok, model_ok = cbi["R"] >= sup, cbi["p_q1"] >= sup
-    cbi["cell"] = np.select([~gold_ok & model_ok, gold_ok & model_ok, gold_ok & ~model_ok], list(CELLS[:3]), CELLS[3])
-    cbi["stratum"] = np.where(cbi["cell"] == "jev_sides_with_model", "A", "B")
-    return cbi.join(pool, rsuffix="_pool").rename(columns={"stated_answer": "model_answer"}).sort_index()
+    gold_ok, model_ok = una["R"] >= sup, una["p_q1"] >= sup
+    una["cell"] = np.select([~gold_ok & model_ok, gold_ok & model_ok, gold_ok & ~model_ok], list(CELLS[:3]), CELLS[3])
+    una["stratum"] = np.where(una["cell"] == "jev_sides_with_model", "A", "B")
+    return una.join(pool, rsuffix="_pool").rename(columns={"stated_answer": "model_answer"}).sort_index()
+
+
+def cbi_items(cfg: DictConfig) -> pd.DataFrame:
+    """The confident errors among the unanimous items, as sampled by the audit."""
+    una = unanimous_items(cfg)
+    return una[una["cbi"]]
 
 
 def design(cbi: pd.DataFrame, cfg: DictConfig) -> pd.DataFrame:

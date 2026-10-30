@@ -129,3 +129,18 @@ def test_real_cbi_population_reproduces_notebook_03_and_sheets_are_blind(tmp_pat
         assert list(sheet.columns) == ["row_id", "item_text", "gold_answer", "gold_derivation", "model_answer",
                                        "model_reasoning", "row_hash", "category", "note"]
     assert (out / "INSTRUCTIONS.md").exists()
+
+
+def test_export_never_overwrites_entered_labels_and_reexport_is_identical(cfg, items):
+    assignment = {"annotator_1": ["finqa:x", "finqa:y"], "annotator_2": ["tatqa:z"]}
+    export_sheets("cbi_audit", items, cfg, assignment=assignment)
+    sheets = {p.name: p.read_bytes() for p in task_dir(cfg, "cbi_audit").glob("*.csv")}
+    export_sheets("cbi_audit", items, cfg, assignment=assignment)          # unlabelled: same bytes again
+    assert {p.name: p.read_bytes() for p in task_dir(cfg, "cbi_audit").glob("*.csv")} == sheets
+    path = task_dir(cfg, "cbi_audit") / "annotator_1.csv"
+    sent = pd.read_csv(path, dtype=str, keep_default_na=False)
+    sent.loc[0, "category"] = "model_error"                                 # the annotator has started
+    sent.to_csv(path, index=False, quoting=csv.QUOTE_ALL)
+    with pytest.raises(AnnotationError, match="already has entries"):
+        export_sheets("cbi_audit", items, cfg, assignment=assignment)
+    assert pd.read_csv(path, dtype=str, keep_default_na=False).loc[0, "category"] == "model_error"

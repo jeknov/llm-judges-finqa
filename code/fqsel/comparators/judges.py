@@ -106,7 +106,8 @@ def determinism_check(client: JudgeClient, cfg: DictConfig, requests: list[dict]
     sample = {ids[i] for i in rng(cfg.global_seed, "judge_determinism").permutation(len(ids))[:n]}
     prompts = [r["prompt"] for r in requests if r["item_id"] in sample]
     again = _send(client, prompts, 1, int(cfg.judges.max_workers))
-    diffs = [abs(answers[p].p_yes - again[p].p_yes) for p in set(prompts)
+    # sorted, so the float sum (and its last digit) does not depend on the process's string-hash seed
+    diffs = [abs(answers[p].p_yes - again[p].p_yes) for p in sorted(set(prompts))
              if answers[p].p_yes is not None and again[p].p_yes is not None]
     return {"n_items": n, "n_requests": len(again), "n_compared": len(diffs),
             "mean_abs_diff": float(np.mean(diffs)) if diffs else None,
@@ -200,4 +201,4 @@ def smoke(cfg: DictConfig, judge: str, n_pairs: int, client: JudgeClient | None 
 
 
 def run(cfg: DictConfig, judges: list[str] | None = None) -> list[dict]:
-    return [run_judge(cfg, j) for j in (judges or list(cfg.judges.models))]
+    return [run_judge(cfg, j) for j in (judges or list(cfg.judges.comparison))]

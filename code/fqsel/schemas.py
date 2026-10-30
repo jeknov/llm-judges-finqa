@@ -315,6 +315,46 @@ TABLES: dict[str, TableDef] = {
         },
         unique=("item_id",),
     ),
+    # CBI replication: path is per judge, scores/judges_cbi/<judge>_long.parquet. One row per unanimous item and
+    # request: the gold arm (Q1, Q2 v2 answer-free, Q3) and the model arm (Q1 on the strong model's modal answer).
+    "judge_cbi_long": TableDef(
+        "scores/judges_cbi/{judge}_long.parquet",
+        {
+            "item_id": Col("str", nonempty=True),
+            "judge": Col("str", nonempty=True),
+            "arm": Col("str", isin=("gold", "model")),
+            "question": Col("str", isin=("q1", "q2", "q3")),
+            "state": Col("str", isin=("judge", "qa")),
+            "stated_answer": Col("str"),
+            "p_yes": Col("float", nullable=True, unit_interval=True),
+            "mass": Col("float"),
+            "top_token": Col("str"),
+            "provider": Col("str", nonempty=True),
+            "served_model": Col("str", nonempty=True),
+            "request_id": Col("str", nonempty=True),
+            "input_tokens": Col("int"),
+            "cost": Col("float", nullable=True),
+            "timestamp": Col("str"),
+        },
+        unique=("item_id", "arm", "question"),
+    ),
+    # Path is per judge, scores/judges_cbi/<judge>.parquet. R_gold / R_model: Q1 with the gold / the model's answer.
+    "judge_cbi": TableDef(
+        "scores/judges_cbi/{judge}.parquet",
+        {
+            "item_id": Col("str", nonempty=True),
+            "judge": Col("str", nonempty=True),
+            "cbi": Col("bool"),
+            "jev_cell": Col("str", isin=("jev_sides_with_model", "both_supported", "gold_only", "neither")),
+            "R_gold": Col("float", nullable=True, unit_interval=True),
+            "Q2_v2": Col("float", nullable=True, unit_interval=True),
+            "Q3": Col("float", nullable=True, unit_interval=True),
+            "I_v2": Col("float", nullable=True, unit_interval=True),
+            "R_model": Col("float", nullable=True, unit_interval=True),
+            "min_mass": Col("float"),
+        },
+        unique=("item_id",),
+    ),
     # Path is per task: annotation/<task>/labels.parquet (pass path= to write_table/read_table).
     "annotation_labels": TableDef(
         "annotation/{task}/labels.parquet",

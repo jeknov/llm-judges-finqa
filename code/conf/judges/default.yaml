@@ -1,10 +1,11 @@
-# Judge comparison (owner decision 2026-10-25): the Jev battery asked of four open-weight LLM judges, two
-# sizes in each of two families, via OpenRouter. An exploratory extension of E0, not a pre-registered test.
-# Each judge is pinned to one provider endpoint in bf16, with no fallbacks, so every call runs on the same
-# deployment; P(yes) is read from the first answer token's log-probabilities (no GPU needed).
+# Judge comparison (owner decision 2026-10-25): the Jev battery asked of open-weight LLM judges via
+# OpenRouter. An exploratory extension of E0, not a pre-registered test. Each judge is pinned to one
+# provider endpoint, with no fallbacks, so every call runs on the same deployment; P(yes) is read from the
+# first answer token's log-probabilities (no GPU needed). The large judges were planned on Novita in bf16
+# and ran on Parasail in fp8 (owner decisions 2026-10-25); their entries name the endpoints actually used.
 endpoint: https://openrouter.ai/api/v1/chat/completions
 api_key_env: OPENROUTER_API_KEY
-prompt: judge_yesno.txt          # wraps one battery question around the rendered item (owner approval pending)
+prompt: judge_yesno.txt          # wraps one battery question around the rendered item (P9, approved 2026-10-25)
 temperature: 0.0
 max_tokens: 1                    # only the first answer token is read
 top_logprobs: 20                 # the most OpenRouter returns; yes/no variants are summed over these
@@ -18,6 +19,9 @@ retry:
   max_attempts: 10
   base_delay_s: 1.0
   max_delay_s: 60.0
+# The judge comparison (notebook 04) as run: `python -m fqsel judges` without --judge scores exactly these.
+# Judges added later for other experiments (e.g. qwen3_30b for the CBI replication) are not part of it.
+comparison: [llama32_3b, llama33_70b, gemma3_4b, gemma4_31b]
 models:
   llama32_3b:
     name: meta-llama/llama-3.2-3b-instruct       # OpenRouter model ID
@@ -30,8 +34,8 @@ models:
     name: meta-llama/llama-3.3-70b-instruct
     weights: meta-llama/Llama-3.3-70B-Instruct
     family: llama
-    provider: {order: [novita/bf16], quantizations: [bf16], allow_fallbacks: false, require_parameters: true}
-    expected_provider: Novita
+    provider: {order: [parasail/fp8], quantizations: [fp8], allow_fallbacks: false, require_parameters: true}
+    expected_provider: Parasail    # planned novita/bf16; moved by owner decision 2026-10-25 (both Llama judges on one provider)
     reasoning: null
   gemma3_4b:
     name: google/gemma-3-4b-it
@@ -44,6 +48,22 @@ models:
     name: google/gemma-4-31b-it
     weights: google/gemma-4-31B-it
     family: gemma
-    provider: {order: [novita/bf16], quantizations: [bf16], allow_fallbacks: false, require_parameters: true}
-    expected_provider: Novita
+    provider: {order: [parasail/fp8], quantizations: [fp8], allow_fallbacks: false, require_parameters: true}
+    expected_provider: Parasail    # planned novita/bf16; moved by owner decision 2026-10-25 (Novita rate-limited every request)
     reasoning: false             # the endpoint supports reasoning; it is switched off so the answer comes first
+  qwen3_30b:                     # owner decision 2026-10-29, for the CBI replication
+    name: qwen/qwen3-30b-a3b-instruct-2507
+    weights: Qwen/Qwen3-30B-A3B-Instruct-2507
+    family: qwen
+    # DekaLLM is the only OpenRouter provider returning log-probabilities for this model (checked 2026-10-29);
+    # it does not report its precision, so no quantization filter can be set.
+    provider: {order: [dekallm], allow_fallbacks: false, require_parameters: true}
+    expected_provider: DekaLLM
+    reasoning: null              # the Instruct-2507 model has no reasoning mode
+# CBI replication (workshop protocol, Experiment 7; owner decision 2026-10-29, minimal scope): each judge scores
+# notebook 03's unanimous items twice in one run on one endpoint, once with the gold answer (Q1, Q2 v2, Q3)
+# and once with the strong model's modal answer (Q1). The population and the CBI definition come from
+# annotation.tasks.cbi_audit (fqsel/cbi_audit.py), the same definition the hand audit uses.
+cbi:
+  judges: [qwen3_30b, gemma4_31b, llama33_70b]
+  determinism_n_items: 200       # one item sample; both arms of each sampled item are re-sent once

@@ -23,11 +23,12 @@ from fqsel.clients.judge_llm import (
 from fqsel.clients.openrouter import ProviderMismatch
 from fqsel.ids import stable_seed
 
-OWNER_JUDGES = {  # owner decision 2026-10-25: model, provider endpoint, reported provider
-    "llama32_3b": ("meta-llama/llama-3.2-3b-instruct", "parasail/bf16", "Parasail"),
-    "llama33_70b": ("meta-llama/llama-3.3-70b-instruct", "novita/bf16", "Novita"),
-    "gemma3_4b": ("google/gemma-3-4b-it", "parasail/bf16", "Parasail"),
-    "gemma4_31b": ("google/gemma-4-31b-it", "novita/bf16", "Novita"),
+OWNER_JUDGES = {  # owner decisions 2026-10-25 (as run) and 2026-10-29: model, endpoint, precision, reported provider
+    "llama32_3b": ("meta-llama/llama-3.2-3b-instruct", "parasail/bf16", ["bf16"], "Parasail"),
+    "llama33_70b": ("meta-llama/llama-3.3-70b-instruct", "parasail/fp8", ["fp8"], "Parasail"),
+    "gemma3_4b": ("google/gemma-3-4b-it", "parasail/bf16", ["bf16"], "Parasail"),
+    "gemma4_31b": ("google/gemma-4-31b-it", "parasail/fp8", ["fp8"], "Parasail"),
+    "qwen3_30b": ("qwen/qwen3-30b-a3b-instruct-2507", "dekallm", None, "DekaLLM"),   # precision not reported
 }
 
 # Hand-built top log-probabilities: "Yes" 0.6, " yes" 0.1, "No" 0.2, "Maybe" 0.05.
@@ -70,15 +71,16 @@ def real(cfg, monkeypatch, tmp_path):
     return _make
 
 
-def test_owner_judges_are_pinned_to_one_bf16_endpoint_without_fallbacks(cfg):
+def test_owner_judges_are_pinned_to_one_endpoint_without_fallbacks(cfg):
     models = cfg.judges.models
     assert set(models) == set(OWNER_JUDGES)
-    for key, (name, tag, provider) in OWNER_JUDGES.items():
+    for key, (name, tag, quant, provider) in OWNER_JUDGES.items():
         m = models[key]
         assert m.name == name and m.expected_provider == provider
-        assert list(m.provider.order) == [tag] and list(m.provider.quantizations) == ["bf16"]
+        assert list(m.provider.order) == [tag]
+        assert (list(m.provider.quantizations) if "quantizations" in m.provider else None) == quant
         assert m.provider.allow_fallbacks is False and m.provider.require_parameters is True
-    assert {models[k].family for k in models} == {"llama", "gemma"}
+    assert {models[k].family for k in models} == {"llama", "gemma", "qwen"}
 
 
 def test_token_normalisation_and_yes_no_mass():
@@ -107,11 +109,11 @@ def test_request_body_pins_provider_and_reads_one_token(real, cfg):
 
 
 def test_gemma4_switches_reasoning_off_and_others_send_nothing(real):
-    backend, fake, _ = real("gemma4_31b", provider="Novita")
+    backend, fake, _ = real("gemma4_31b", provider="Parasail")
     backend.ask("PROMPT")
     assert fake.bodies[-1]["reasoning"] == {"enabled": False}
-    for judge in ("llama32_3b", "llama33_70b", "gemma3_4b"):
-        backend, fake, _ = real(judge, provider=OWNER_JUDGES[judge][2])
+    for judge in ("llama32_3b", "llama33_70b", "gemma3_4b", "qwen3_30b"):
+        backend, fake, _ = real(judge, provider=OWNER_JUDGES[judge][3])
         backend.ask("PROMPT")
         assert "reasoning" not in fake.bodies[-1]
 
@@ -157,3 +159,14 @@ def test_make_judge_uses_the_mock_on_tiny_and_refuses_unknown_judges(cfg):
     assert isinstance(client.backend, MockJudge) and client.model_version == "gemma3_4b@mock"
     with pytest.raises(KeyError):
         make_judge(cfg, "gpt-5")
+
+
+def test_judge_comparison_keeps_its_original_four_judges(cfg, monkeypatch):
+    """Judges added for later experiments (qwen3_30b) never enter the judge comparison's default run."""
+    from fqsel.comparators import judges
+
+    assert list(cfg.judges.comparison) == ["llama32_3b", "llama33_70b", "gemma3_4b", "gemma4_31b"]
+    ran = []
+    monkeypatch.setattr(judges, "run_judge", lambda c, j: ran.append(j))
+    judges.run(cfg)
+    assert ran == list(cfg.judges.comparison) and "qwen3_30b" not in ran

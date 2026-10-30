@@ -234,6 +234,19 @@ To test whether the answer leakage found with Jev depends on the judge and its s
 
 > All four judges were served by the same provider (Parasail, via OpenRouter, with no fallback routing): the two small judges (Llama 3.2 3B Instruct, Gemma 3 4B) in bf16, and the two large judges (Llama 3.3 70B Instruct, Gemma 4 31B) in fp8, the only precision in which that provider serves them (the bf16 endpoint we had planned for Gemma 4 31B was persistently rate-limited, and we kept all four judges on one provider); within each family, judge size is therefore confounded with numerical precision, and we compare judges only by rank-based measures (AUROC, Spearman correlation).
 
+## Reproducing the experiments
+
+Every finished experiment can be re-run from its archive without new API calls, and `tests/real_data/test_reproduction.py` checks this against the frozen snapshots (requires the DVC-tracked `code/runs/` and `code/.cache/`).
+
+| Experiment | Command (from `code/`) | Snapshot |
+| --- | --- | --- |
+| Jev battery v2 (primary) / v0 | `python -m fqsel run jev profile=full` (battery via `jev.battery_version`) | `runs/full_v2_2026-10-25/`, `runs/full_v0_2026-10-24/` |
+| Self-consistency (Qwen) | `python -m fqsel self-consistency profile=full` | `runs/self_consistency_2026-10-25/` |
+| Jev on Qwen's answers | `python scripts/jev_on_qwen_answers.py` | `runs/jev_on_qwen_2026-10-25/` |
+| Judge comparison (4 judges) | `python -m fqsel judges profile=full` (Gemma pair also with `judges.include_paraphrase=true`) | `runs/judges_2026-10-26/` |
+| CBI audit sheets | `python -m fqsel annotate export cbi_audit profile=full` (refuses to overwrite entered labels) | `code/annotation/cbi_audit/` |
+| CBI replication (3 judges) | `python -m fqsel judges-cbi profile=full` | to be snapshotted after the runs |
+
 ## Blockers and next steps
 
 **Blockers:**
@@ -251,6 +264,7 @@ To test whether the answer leakage found with Jev depends on the judge and its s
 
 **Next:**
 - **When self-consistency finishes:** record it.
+- **CBI replication with judges (Experiment 7):** code ready (`python -m fqsel judges-cbi`; Qwen3-30B on DekaLLM, Gemma 4 31B and Llama 3.3 70B on Parasail fp8); next: `--smoke 4` per judge, then the runs (about $2).
 - **CBI hand audit:** sheets exported (`code/annotation/cbi_audit/`, 40 rows per annotator, with `INSTRUCTIONS.md`); waiting for annotators.
 - **Judge comparison:** runs done and archived (`code/runs/judges_2026-10-26/`); analysed in `notebooks/04_judge_comparison_analysis.ipynb`. Optional: Llama paraphrases (about $1.10).
 - **Milestone 4's full run:** on the GPU node.
