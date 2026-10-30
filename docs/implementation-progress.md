@@ -251,6 +251,7 @@ To test whether the answer leakage found with Jev depends on the judge and its s
 
 **Next:**
 - **When self-consistency finishes:** record it.
+- **CBI hand audit:** sheets exported (`code/annotation/cbi_audit/`, 40 rows per annotator, with `INSTRUCTIONS.md`); waiting for annotators.
 - **Judge comparison:** runs done and archived (`code/runs/judges_2026-10-26/`); analysed in `notebooks/04_judge_comparison_analysis.ipynb`. Optional: Llama paraphrases (about $1.10).
 - **Milestone 4's full run:** on the GPU node.
 - **Then milestone 5:** the remaining comparators, E0, the H1 verdict and gates D1–D4. These are the first scientific results.

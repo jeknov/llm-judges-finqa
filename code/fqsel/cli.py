@@ -74,6 +74,15 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         judges.run(cfg, names)
         return 0
+    if args.task == "cbi_audit":
+        from fqsel import cbi_audit
+
+        if args.action == "export":
+            for path in cbi_audit.export_task(cfg):
+                print(f"wrote {path}")
+        else:
+            print(cbi_audit.import_task(cfg))
+        return 0
     from fqsel import q3_validation
 
     if args.action == "export":

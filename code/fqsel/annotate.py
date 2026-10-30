@@ -1,17 +1,20 @@
 """Human labeling through CSV files, never an annotation platform (Spec 1, Annotation sheets).
 
 export_sheets(task, items, cfg) writes annotation/<task>/<annotator>.csv per annotator plus a private key
-file mapping opaque row IDs to item IDs (item IDs can reveal validation status, e.g. "#neg"). Annotators
-fill in the label columns with yes or no and return the same file, which is placed in
+file mapping opaque row IDs to item IDs (item IDs can reveal validation status, e.g. "#neg"). By default
+every annotator gets every item; `assignment` gives each annotator their own subset instead (the CBI audit
+double-annotates only a third). Annotators fill in the label columns with one of the task's labels (the
+task's `labels` in conf/annotation, else the global yes/no) and return the same file, which is placed in
 annotation/<task>/returned/<annotator>.csv. import_sheets(task, cfg) enforces what a CSV cannot: labels
-are yes/no after trimming and lowercasing; no row is added, removed or reordered; no item column is
-edited (checked against the row_hash written at export). Labels go to annotation/<task>/labels.parquet.
+are allowed values after trimming and lowercasing; no row is added, removed or reordered; no item column
+is edited (checked against the row_hash written at export). Labels go to annotation/<task>/labels.parquet.
 """
 
 from __future__ import annotations
 
 import csv
 import hashlib
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 
 import pandas as pd
@@ -45,12 +48,15 @@ def _task(cfg: DictConfig, task: str):
     if task not in cfg.annotation.tasks:
         raise AnnotationError(f"unknown annotation task {task!r}")
     spec = cfg.annotation.tasks[task]
-    return list(spec.item_columns), list(spec.label_columns)
+    labels = spec.labels if "labels" in spec else cfg.annotation.labels
+    return list(spec.item_columns), list(spec.label_columns), [str(v).lower() for v in labels]
 
 
-def export_sheets(task: str, items: pd.DataFrame, cfg: DictConfig) -> list[Path]:
-    """`items` has an item_id column plus the task's item columns."""
-    item_cols, label_cols = _task(cfg, task)
+def export_sheets(task: str, items: pd.DataFrame, cfg: DictConfig,
+                  assignment: Mapping[str, Iterable[str]] | None = None) -> list[Path]:
+    """`items` has an item_id column plus the task's item columns. `assignment` maps every annotator to the
+    item IDs on their sheet; each item must be on at least one sheet."""
+    item_cols, label_cols, _ = _task(cfg, task)
     missing = [c for c in ["item_id", *item_cols] if c not in items.columns]
     if missing:
         raise AnnotationError(f"items lack columns {missing}")
@@ -65,10 +71,19 @@ def export_sheets(task: str, items: pd.DataFrame, cfg: DictConfig) -> list[Path]
         [{"row_id": r["row_id"], "item_id": it} for r, it in zip(rows, sorted(items["item_id"]), strict=True)]
     ).to_csv(out_dir / KEY_FILE, index=False, quoting=csv.QUOTE_ALL)
     header = ["row_id", *item_cols, "row_hash", *label_cols, "note"]
+    annotators = list(cfg.annotation.annotators)
+    if assignment is None:
+        assignment = {a: list(items["item_id"]) for a in annotators}
+    if sorted(assignment) != sorted(annotators):
+        raise AnnotationError(f"assignment must cover exactly the annotators {annotators}")
+    assigned = {a: {row_id(task, i) for i in ids} for a, ids in assignment.items()}
+    if set().union(*assigned.values()) != {r["row_id"] for r in rows}:
+        raise AnnotationError("assignment must put every item, and only these items, on at least one sheet")
     paths = []
-    for annotator in cfg.annotation.annotators:
-        order = rng(task, annotator).permutation(len(rows))
-        sheet = pd.DataFrame([rows[i] for i in order], columns=header)
+    for annotator in annotators:
+        mine = [r for r in rows if r["row_id"] in assigned[annotator]]
+        order = rng(task, annotator).permutation(len(mine))
+        sheet = pd.DataFrame([mine[i] for i in order], columns=header)
         path = out_dir / f"{annotator}.csv"
         sheet.to_csv(path, index=False, quoting=csv.QUOTE_ALL, encoding="utf-8")
         paths.append(path)
@@ -80,10 +95,10 @@ def _read_csv(path: Path) -> pd.DataFrame:
 
 
 def import_sheets(task: str, cfg: DictConfig) -> pd.DataFrame:
-    item_cols, label_cols = _task(cfg, task)
+    item_cols, label_cols, labels = _task(cfg, task)
     base = task_dir(cfg, task)
     key = dict(_read_csv(base / KEY_FILE)[["row_id", "item_id"]].itertuples(index=False))
-    allowed = {str(v).lower() for v in cfg.annotation.labels}
+    allowed = set(labels)
     records = []
     imported_at = now_iso()
     for annotator in cfg.annotation.annotators:

@@ -8,3 +8,18 @@ tasks:
   q3_templates:                  # Spec 1, Validation: 50 hand-checked items per template
     item_columns: [item_text, check_text]
     label_columns: [follows_from_answer]
+  cbi_audit:                     # Workshop protocol, Experiment 8 (owner decision 2026-10-26): why Qwen's confident errors are "wrong"
+    item_columns: [item_text, gold_answer, gold_derivation, model_answer, model_reasoning]
+    label_columns: [category]
+    labels: [model_error, scoring_artefact, ambiguous_question, questionable_gold]
+    # Sample: the 'defensible minimum' with the cheaper compromise on double annotation.
+    n_per_stratum: 30            # stratum A: Jev rejects the gold and supports Qwen; stratum B: the other CBI items
+    double_per_stratum: 10       # a third of each stratum on both sheets, for agreement; the rest split evenly
+    # CBI as defined in notebooks/03_self_consistency_analysis.ipynb (sections 9 and 10), on its frozen snapshots
+    consistency_threshold: 0.8   # 1 - H/log n over the 5 normalised answers (CBI paper; unanimity at n = 5)
+    wrong_below: 0.6             # wrong if fewer than 3 of 5 samples match the gold (exact match + numeric equivalence)
+    supported_threshold: 0.5     # Jev "supports" an answer when P(yes | Q1) >= 0.5
+    snapshots:
+      self_consistency: self_consistency_2026-10-25
+      jev_on_qwen: jev_on_qwen_2026-10-25
+      pool_and_jev: full_v2_2026-10-25

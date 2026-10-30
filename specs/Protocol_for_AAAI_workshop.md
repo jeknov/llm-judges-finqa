@@ -155,7 +155,7 @@ The notebook's main limitation for Experiment 5 is that Jev may be built on a Qw
 ### 8. Human validation and audit — to do (no GPU; annotators needed)
 
 - **Q3 check validation** (100 items, acceptance ≥ 90%): required before any claim about Q3 or I.
-- **CBI hand audit** (about 100 items): each item labelled *model error*, *scoring artefact*, *ambiguous or under-determined question*, or *questionable gold label*. The sample oversamples the 90 items where Jev sides with Qwen and also includes the 163 "both supported" and the 14 "clean catch" items. This is the CBI paper's recommended "Q4 mass on a small labelled sample". It decides how much of the CBI mass is model error and how much is item ambiguity or label noise. That decides the reading of Experiments 4 and 5, and it ties CBI to the determinacy construct.
+- **CBI hand audit** (sheets exported 26 Oct: 60 items, 30 per stratum, 20 double-annotated; `code/annotation/cbi_audit/`; originally planned at about 100 items): each item labelled *model error*, *scoring artefact*, *ambiguous or under-determined question*, or *questionable gold label*. The sample oversamples the 90 items where Jev sides with Qwen and also includes the 163 "both supported" and the 14 "clean catch" items. This is the CBI paper's recommended "Q4 mass on a small labelled sample". It decides how much of the CBI mass is model error and how much is item ambiguity or label noise. That decides the reading of Experiments 4 and 5, and it ties CBI to the determinacy construct.
 
 ### Out of scope for this paper (future work)
 

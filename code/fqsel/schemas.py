@@ -25,6 +25,8 @@ SOURCE_SPLITS = ("train", "dev", "test")
 ANSWER_TYPES = ("lookup", "arith")
 CHECK_TYPES = ("direction", "total", "ordering", "magnitude", "unit")
 FAILURE_REASONS = ("parse", "exec_error", "mismatch", "span_missing")
+# Labels of the CBI hand audit (conf/annotation, task cbi_audit); the other tasks label yes/no.
+CBI_AUDIT_LABELS = ("model_error", "scoring_artefact", "ambiguous_question", "questionable_gold")
 
 
 @dataclass(frozen=True)
@@ -320,7 +322,7 @@ TABLES: dict[str, TableDef] = {
             "item_id": Col("str", nonempty=True),
             "annotator": Col("str", nonempty=True),
             "label_column": Col("str", nonempty=True),
-            "label": Col("str", isin=("yes", "no")),
+            "label": Col("str", isin=("yes", "no", *CBI_AUDIT_LABELS)),
             "note": Col("str", nullable=True),
             "imported_at": Col("str"),
         },
