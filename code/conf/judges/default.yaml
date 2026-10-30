@@ -20,7 +20,7 @@ retry:
   base_delay_s: 1.0
   max_delay_s: 60.0
 # The judge comparison (notebook 04) as run: `python -m fqsel judges` without --judge scores exactly these.
-# Judges added later for other experiments (e.g. qwen3_30b for the CBI replication) are not part of it.
+# Judges added later for other experiments (e.g. qwen3_235b for the CBI replication) are not part of it.
 comparison: [llama32_3b, llama33_70b, gemma3_4b, gemma4_31b]
 models:
   llama32_3b:
@@ -60,10 +60,20 @@ models:
     provider: {order: [dekallm], allow_fallbacks: false, require_parameters: true}
     expected_provider: DekaLLM
     reasoning: null              # the Instruct-2507 model has no reasoning mode
+    # Not run: DekaLLM's shared pool rate-limited every request on 2026-10-29 and 2026-10-30 (HTTP 429 upstream).
+  qwen3_235b:                    # owner decision 2026-10-30, replaces qwen3_30b in the CBI replication
+    name: qwen/qwen3-235b-a22b-2507
+    weights: Qwen/Qwen3-235B-A22B-Instruct-2507   # the strong model itself (conf/strong): a self-judging control
+    family: qwen
+    # The strong model ran on deepinfra/fp8, which returns no log-probabilities; Parasail serves the same
+    # weights in fp8 and does (checked 2026-10-30).
+    provider: {order: [parasail/fp8], quantizations: [fp8], allow_fallbacks: false, require_parameters: true}
+    expected_provider: Parasail
+    reasoning: null              # the Instruct-2507 model has no reasoning mode
 # CBI replication (workshop protocol, Experiment 7; owner decision 2026-10-29, minimal scope): each judge scores
 # notebook 03's unanimous items twice in one run on one endpoint, once with the gold answer (Q1, Q2 v2, Q3)
 # and once with the strong model's modal answer (Q1). The population and the CBI definition come from
 # annotation.tasks.cbi_audit (fqsel/cbi_audit.py), the same definition the hand audit uses.
 cbi:
-  judges: [qwen3_30b, gemma4_31b, llama33_70b]
+  judges: [qwen3_235b, gemma4_31b, llama33_70b]   # qwen3_30b replaced 2026-10-30 (DekaLLM blocked)
   determinism_n_items: 200       # one item sample; both arms of each sampled item are re-sent once

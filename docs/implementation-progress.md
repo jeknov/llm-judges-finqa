@@ -245,7 +245,8 @@ Every finished experiment can be re-run from its archive without new API calls, 
 | Jev on Qwen's answers | `python scripts/jev_on_qwen_answers.py` | `runs/jev_on_qwen_2026-10-25/` |
 | Judge comparison (4 judges) | `python -m fqsel judges profile=full` (Gemma pair also with `judges.include_paraphrase=true`) | `runs/judges_2026-10-26/` |
 | CBI audit sheets | `python -m fqsel annotate export cbi_audit profile=full` (refuses to overwrite entered labels) | `code/annotation/cbi_audit/` |
-| CBI replication (3 judges) | `python -m fqsel judges-cbi profile=full` | to be snapshotted after the runs |
+| CBI replication (Llama 3.3 70B, Gemma 4 31B) | `python -m fqsel judges-cbi --judge llama33_70b --judge gemma4_31b profile=full` | `runs/judges_cbi_2026-10-30/` |
+| CBI replication (Qwen3-235B, the generator as judge) | `python -m fqsel judges-cbi --judge qwen3_235b profile=full` | `runs/judges_cbi_qwen_2026-10-30/` |
 
 ## Blockers and next steps
 
@@ -264,7 +265,7 @@ Every finished experiment can be re-run from its archive without new API calls, 
 
 **Next:**
 - **When self-consistency finishes:** record it.
-- **CBI replication with judges (Experiment 7):** code ready (`python -m fqsel judges-cbi`; Qwen3-30B on DekaLLM, Gemma 4 31B and Llama 3.3 70B on Parasail fp8); next: `--smoke 4` per judge, then the runs (about $2).
+- **CBI replication with judges (Experiment 7):** done. Llama 3.3 70B, Gemma 4 31B and Qwen3-235B (the generator's own weights, replacing Qwen3-30B, which DekaLLM's upstream rate limit blocked on two days) ran on 30 Oct for $1.93 in total, archived and analysed in `notebooks/03b_cbi_judges_analysis.ipynb`.
 - **CBI hand audit:** sheets exported (`code/annotation/cbi_audit/`, 40 rows per annotator, with `INSTRUCTIONS.md`); waiting for annotators.
 - **Judge comparison:** runs done and archived (`code/runs/judges_2026-10-26/`); analysed in `notebooks/04_judge_comparison_analysis.ipynb`. Optional: Llama paraphrases (about $1.10).
 - **Milestone 4's full run:** on the GPU node.

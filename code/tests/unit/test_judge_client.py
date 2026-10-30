@@ -23,12 +23,13 @@ from fqsel.clients.judge_llm import (
 from fqsel.clients.openrouter import ProviderMismatch
 from fqsel.ids import stable_seed
 
-OWNER_JUDGES = {  # owner decisions 2026-10-25 (as run) and 2026-10-29: model, endpoint, precision, reported provider
+OWNER_JUDGES = {  # owner decisions 2026-10-25 (as run), 2026-10-29 and 2026-10-30: model, endpoint, precision, reported provider
     "llama32_3b": ("meta-llama/llama-3.2-3b-instruct", "parasail/bf16", ["bf16"], "Parasail"),
     "llama33_70b": ("meta-llama/llama-3.3-70b-instruct", "parasail/fp8", ["fp8"], "Parasail"),
     "gemma3_4b": ("google/gemma-3-4b-it", "parasail/bf16", ["bf16"], "Parasail"),
     "gemma4_31b": ("google/gemma-4-31b-it", "parasail/fp8", ["fp8"], "Parasail"),
     "qwen3_30b": ("qwen/qwen3-30b-a3b-instruct-2507", "dekallm", None, "DekaLLM"),   # precision not reported
+    "qwen3_235b": ("qwen/qwen3-235b-a22b-2507", "parasail/fp8", ["fp8"], "Parasail"),
 }
 
 # Hand-built top log-probabilities: "Yes" 0.6, " yes" 0.1, "No" 0.2, "Maybe" 0.05.
@@ -112,7 +113,7 @@ def test_gemma4_switches_reasoning_off_and_others_send_nothing(real):
     backend, fake, _ = real("gemma4_31b", provider="Parasail")
     backend.ask("PROMPT")
     assert fake.bodies[-1]["reasoning"] == {"enabled": False}
-    for judge in ("llama32_3b", "llama33_70b", "gemma3_4b", "qwen3_30b"):
+    for judge in ("llama32_3b", "llama33_70b", "gemma3_4b", "qwen3_30b", "qwen3_235b"):
         backend, fake, _ = real(judge, provider=OWNER_JUDGES[judge][3])
         backend.ask("PROMPT")
         assert "reasoning" not in fake.bodies[-1]
@@ -162,11 +163,11 @@ def test_make_judge_uses_the_mock_on_tiny_and_refuses_unknown_judges(cfg):
 
 
 def test_judge_comparison_keeps_its_original_four_judges(cfg, monkeypatch):
-    """Judges added for later experiments (qwen3_30b) never enter the judge comparison's default run."""
+    """Judges added for later experiments (qwen3_30b, qwen3_235b) never enter the judge comparison's default run."""
     from fqsel.comparators import judges
 
     assert list(cfg.judges.comparison) == ["llama32_3b", "llama33_70b", "gemma3_4b", "gemma4_31b"]
     ran = []
     monkeypatch.setattr(judges, "run_judge", lambda c, j: ran.append(j))
     judges.run(cfg)
-    assert ran == list(cfg.judges.comparison) and "qwen3_30b" not in ran
+    assert ran == list(cfg.judges.comparison) and not {"qwen3_30b", "qwen3_235b"} & set(ran)

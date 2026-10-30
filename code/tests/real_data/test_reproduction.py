@@ -77,3 +77,26 @@ def test_cbi_audit_export_reproduces_the_sheets_sent_to_annotators(tmp_path):
         ours = pd.read_csv(new / f"{a}.csv", dtype=str, keep_default_na=False)
         theirs = pd.read_csv(sent / f"{a}.csv", dtype=str, keep_default_na=False)
         pd.testing.assert_frame_equal(ours.drop(columns=labels), theirs.drop(columns=labels))
+
+
+@pytest.mark.parametrize(("judge", "snapshot"), [("llama33_70b", "judges_cbi_2026-10-30"),
+                                                ("gemma4_31b", "judges_cbi_2026-10-30"),
+                                                ("qwen3_235b", "judges_cbi_qwen_2026-10-30")])
+def test_cbi_replication_reproduces_from_the_archive(tmp_path, judge, snapshot):
+    from fqsel.comparators import judges_cbi
+
+    snap = RUNS / snapshot / judge
+    if not snap.exists():
+        pytest.skip("CBI replication snapshot not checked out")
+    (tmp_path / "runs").symlink_to(RUNS)
+    cfg = load_config(["profile=full", f"paths.root={tmp_path}", f"paths.cache={CACHE}"],
+                      ignore=tuple(i for i in get_stage("jev").ignores if i not in JUDGES_SCOPE))
+    m = cfg.judges.models[judge]
+    client = JudgeClient(NoNetwork(f"{m.name}@{'/'.join(m.provider.order)}"), JsonCache(CACHE / "judges" / judge),
+                         request_params(cfg))
+    manifest = judges_cbi.run_judge(cfg, judge, client=client)
+    for name, f in (("judge_cbi_long", f"{judge}_long.parquet"), ("judge_cbi", f"{judge}.parquet")):
+        pd.testing.assert_frame_equal(read_table(name, cfg, path=f"scores/judges_cbi/{f}"), pd.read_parquet(snap / f))
+    old = json.loads((snap / f"{judge}_manifest.json").read_text())
+    old.pop("requests_sent_this_run"), manifest.pop("requests_sent_this_run")
+    assert manifest == old

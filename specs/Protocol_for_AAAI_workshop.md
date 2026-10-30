@@ -148,9 +148,21 @@ Points the paper adds to the CBI literature:
   - P(yes) levels are not calibrated across judges, so only AUROCs and rank correlations are compared.
 - **Cost (actual):** $2.76 in total: Gemma 3 4B $0.35 and Gemma 4 31B $1.29 with paraphrases; Llama 3.2 3B $0.31 and Llama 3.3 70B $0.81, core only.
 
-### 7. Judges from other families on Qwen's answers — ready to run (code done; owner-approved 29 Oct)
+### 7. Judges from other families, and the generator itself, on Qwen's answers — done (notebook 03b)
 
-The notebook's main limitation for Experiment 5 is that Jev may be built on a Qwen model (still unanswered by TypeSafe). If so, generator–judge convergence is partly shared training. Three open-weight judges repeat Experiment 5 on the same items: **Qwen3-30B-A3B** (same family as the generator, as a control; DekaLLM, precision not reported), **Gemma 4 31B** and **Llama 3.3 70B** (Parasail fp8). Each judge scores both the gold answer (Q1, Q2 v2, Q3) and Qwen's modal answer (Q1) on notebook 03's 1,730 unanimous items (281 CBI), in one run on one endpoint (`python -m fqsel judges-cbi`). Primary metrics: per judge, the AUROC of judging the model's answer and of judging the gold for reliable vs CBI, and their paired difference; secondary: the joint verdict table, overlap with Jev's 90 "sides with Qwen" items, and whether the Qwen judge endorses Qwen's errors more than the others. Pre-specified in the implementation plan before any score. Estimated cost about $2.
+The notebook's main limitation for Experiment 5 is that Jev may be built on a Qwen model (still unanswered by TypeSafe). If so, generator–judge convergence is partly shared training. Three open-weight judges repeat Experiment 5 on the same items: **Qwen3-30B-A3B** (same family as the generator, as a control; DekaLLM, precision not reported), **Gemma 4 31B** and **Llama 3.3 70B** (Parasail fp8). Each judge scores both the gold answer (Q1, Q2 v2, Q3) and Qwen's modal answer (Q1) on notebook 03's 1,730 unanimous items (281 CBI), in one run on one endpoint (`python -m fqsel judges-cbi`). Qwen3-30B could not be run (DekaLLM rate-limited every request on 29 and 30 Oct), so the owner replaced it on 30 Oct with **Qwen3-235B-A22B-Instruct-2507**, the generator's own weights (Parasail fp8; the generator's samples came from DeepInfra fp8, which returns no log-probabilities). The family control thereby becomes a self-judging control. Primary metrics: per judge, the AUROC of judging the model's answer and of judging the gold for reliable vs CBI, and their paired difference; secondary: the joint verdict table, overlap with Jev's 90 "sides with Qwen" items, and whether the Qwen judge endorses Qwen's errors more than the others. Pre-specified in the implementation plan before any score.
+
+**Results** (`notebooks/03b_cbi_judges_analysis.ipynb`; all three runs 30 Oct, $1.93 in total: Llama $0.75, Gemma $0.61, Qwen3-235B $0.57):
+
+| | Jev | Llama 3.3 70B | Gemma 4 31B | Qwen3-235B (generator) |
+| --- | --- | --- | --- | --- |
+| AUROC judging the gold (reliable vs CBI) | 0.75 | 0.64 | 0.73 | 0.66 |
+| AUROC judging Qwen's answer | 0.62 | 0.49 | 0.56 | 0.50 |
+| Paired gap, gold − model | +0.13 [0.09, 0.17] | +0.15 [0.11, 0.19] | +0.17 [0.13, 0.21] | +0.16 [0.12, 0.20] |
+| CBI answers judged supported (P ≥ 0.9) | 68% | 80% | 88% | 89% |
+| CBI items where the judge sides with Qwen against the gold | 90 | 89 | 101 | 77 |
+
+The asymmetry (judging the gold works, judging the model's answer does not) holds for all four judges, including the generator judging its own answers (exactly at chance). The judges side with Qwen on largely the same items: overlaps with Jev are about twice what independent choice would give, 50 items (40 FinQA arithmetic) are shared by the three other-family judges, and the generator sides with its own answer on 41 of them. The generator is the most lenient judge but not distinctively self-favouring: it endorses its confident errors no more than Gemma (89% vs 88%), rejects the gold least often, and prefers its own answer over the gold no more often than Llama does.
 
 ### 8. Human validation and audit — to do (no GPU; annotators needed)
 

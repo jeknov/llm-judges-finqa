@@ -68,11 +68,11 @@ def client(cfg, root, name, backend=None):
 
 
 def test_cbi_judges_are_the_owners_choice_on_pinned_endpoints(cfg):
-    assert list(cfg.judges.cbi.judges) == ["qwen3_30b", "gemma4_31b", "llama33_70b"]
+    assert list(cfg.judges.cbi.judges) == ["qwen3_235b", "gemma4_31b", "llama33_70b"]   # qwen3_30b replaced 2026-10-30
     m = cfg.judges.models
-    assert m.qwen3_30b.name == "qwen/qwen3-30b-a3b-instruct-2507" and m.qwen3_30b.expected_provider == "DekaLLM"
-    assert list(m.qwen3_30b.provider.order) == ["dekallm"] and m.qwen3_30b.provider.allow_fallbacks is False
-    for j in ("gemma4_31b", "llama33_70b"):
+    assert m.qwen3_235b.name == cfg.model.strong.name == "qwen/qwen3-235b-a22b-2507"           # the generator judges itself
+    assert m.qwen3_235b.weights == cfg.model.strong.version and m.qwen3_235b.provider.allow_fallbacks is False
+    for j in ("qwen3_235b", "gemma4_31b", "llama33_70b"):
         assert list(m[j].provider.order) == ["parasail/fp8"] and m[j].expected_provider == "Parasail"
 
 
