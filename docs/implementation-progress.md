@@ -245,6 +245,7 @@ Every finished experiment can be re-run from its archive without new API calls, 
 | Jev on Qwen's answers | `python scripts/jev_on_qwen_answers.py` | `runs/jev_on_qwen_2026-10-25/` |
 | Judge comparison (4 judges) | `python -m fqsel judges profile=full` (Gemma pair also with `judges.include_paraphrase=true`) | `runs/judges_2026-10-26/` |
 | CBI audit sheets | `python -m fqsel annotate export cbi_audit profile=full` (refuses to overwrite entered labels) | `code/annotation/cbi_audit/` |
+| CBI audit labels (import, adjudication sheet, final labels) | `python -m fqsel annotate import cbi_audit profile=full`, then `annotate adjudicate cbi_audit` and, once returned, `annotate import-adjudication cbi_audit` (returned sheets go in `returned/` and `adjudication/returned/`) | `runs/cbi_audit_2026-10-31/` |
 | CBI replication (Llama 3.3 70B, Gemma 4 31B) | `python -m fqsel judges-cbi --judge llama33_70b --judge gemma4_31b profile=full` | `runs/judges_cbi_2026-10-30/` |
 | CBI replication (Qwen3-235B, the generator as judge) | `python -m fqsel judges-cbi --judge qwen3_235b profile=full` | `runs/judges_cbi_qwen_2026-10-30/` |
 
@@ -266,7 +267,7 @@ Every finished experiment can be re-run from its archive without new API calls, 
 **Next:**
 - **When self-consistency finishes:** record it.
 - **CBI replication with judges (Experiment 7):** done. Llama 3.3 70B, Gemma 4 31B and Qwen3-235B (the generator's own weights, replacing Qwen3-30B, which DekaLLM's upstream rate limit blocked on two days) ran on 30 Oct for $1.93 in total, archived and analysed in `notebooks/03b_cbi_judges_analysis.ipynb`.
-- **CBI hand audit:** sheets exported (`code/annotation/cbi_audit/`, 40 rows per annotator, with `INSTRUCTIONS.md`); waiting for annotators.
+- **CBI hand audit:** done (31 Oct). 60 items, two annotators (agreement 70%, κ 0.60) plus a third for the 6 disagreements; labels archived in `code/runs/cbi_audit_2026-10-31/` and analysed in notebook 03 §11 and notebook 03b §6b. An estimated 19% of the 281 confident errors are model errors, 47% scoring artefacts and 34% item problems; where Jev sides with Qwen, 70% are item problems.
 - **Judge comparison:** runs done and archived (`code/runs/judges_2026-10-26/`); analysed in `notebooks/04_judge_comparison_analysis.ipynb`. Optional: Llama paraphrases (about $1.10).
 - **Milestone 4's full run:** on the GPU node.
 - **Then milestone 5:** the remaining comparators, E0, the H1 verdict and gates D1–D4. These are the first scientific results.

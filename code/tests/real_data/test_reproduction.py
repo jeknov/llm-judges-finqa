@@ -100,3 +100,27 @@ def test_cbi_replication_reproduces_from_the_archive(tmp_path, judge, snapshot):
     old = json.loads((snap / f"{judge}_manifest.json").read_text())
     old.pop("requests_sent_this_run"), manifest.pop("requests_sent_this_run")
     assert manifest == old
+
+
+def test_cbi_audit_labels_reproduce_from_the_returned_sheets(tmp_path):
+    """Importing the archived returned sheets (both annotators, then the adjudication) gives the frozen labels."""
+    import shutil
+
+    from fqsel import cbi_audit
+
+    snap = RUNS / "cbi_audit_2026-10-31"
+    if not snap.exists():
+        pytest.skip("CBI audit snapshot not checked out")
+    src = snap / "annotation" / "cbi_audit"
+    dst = tmp_path / "annotation" / "cbi_audit"
+    keep = ["_design.csv", "_key.csv", "annotator_1.csv", "annotator_2.csv", "returned",
+            "adjudication/annotator_3.csv", "adjudication/returned"]
+    for rel in keep:                                       # inputs only; every output is rebuilt
+        (dst / rel).parent.mkdir(parents=True, exist_ok=True)
+        (shutil.copytree if (src / rel).is_dir() else shutil.copy2)(src / rel, dst / rel)
+    cfg = load_config(["profile=full", f"paths.root={tmp_path}"], ignore=tuple(get_stage("q3").ignores))   # as `annotate`
+    assert cbi_audit.import_task(cfg) == json.loads((snap / "results" / "cbi_audit.json").read_text())
+    assert cbi_audit.import_adjudication(cfg) == json.loads((snap / "results" / "cbi_audit_final.json").read_text())
+    pd.testing.assert_frame_equal(pd.read_parquet(dst / "final_labels.parquet"), pd.read_parquet(src / "final_labels.parquet"))
+    pd.testing.assert_frame_equal(pd.read_parquet(dst / "labels.parquet").drop(columns="imported_at"),
+                                  pd.read_parquet(src / "labels.parquet").drop(columns="imported_at"))

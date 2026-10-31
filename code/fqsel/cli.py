@@ -1,4 +1,4 @@
-"""Command line: python -m fqsel {run <stage> | check | annotate export|import <task> | self-consistency |
+"""Command line: python -m fqsel {run <stage> | check | annotate export|import|adjudicate|import-adjudication <task> | self-consistency |
 judges [--judge NAME]... [--smoke N_PAIRS] | judges-cbi [--judge NAME]... [--smoke N_ITEMS]} [hydra overrides]."""
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ def main(argv: list[str] | None = None) -> int:
     p_check = sub.add_parser("check", help="re-validate all outputs and cross-table invariants")
     p_check.add_argument("overrides", nargs="*")
     p_ann = sub.add_parser("annotate", help="export or import human-label CSV files")
-    p_ann.add_argument("action", choices=["export", "import"])
+    p_ann.add_argument("action", choices=["export", "import", "adjudicate", "import-adjudication"])
     p_ann.add_argument("task")
     p_ann.add_argument("overrides", nargs="*")
     p_sc = sub.add_parser("self-consistency",
@@ -98,14 +98,19 @@ def main(argv: list[str] | None = None) -> int:
     if args.task == "cbi_audit":
         from fqsel import cbi_audit
 
-        if args.action == "export":
-            for path in cbi_audit.export_task(cfg):
+        if args.action in ("export", "adjudicate"):
+            for path in (cbi_audit.export_task if args.action == "export" else cbi_audit.export_adjudication)(cfg):
                 print(f"wrote {path}")
+        elif args.action == "import-adjudication":
+            print(cbi_audit.import_adjudication(cfg))
         else:
             print(cbi_audit.import_task(cfg))
         return 0
     from fqsel import q3_validation
 
+    if args.action in ("adjudicate", "import-adjudication"):
+        print(f"annotate {args.action}: only the cbi_audit task has an adjudication step, not {args.task!r}", file=sys.stderr)
+        return 2
     if args.action == "export":
         for path in q3_validation.export_task(args.task, cfg):
             print(f"wrote {path}")

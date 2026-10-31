@@ -144,3 +144,64 @@ def test_export_never_overwrites_entered_labels_and_reexport_is_identical(cfg, i
     with pytest.raises(AnnotationError, match="already has entries"):
         export_sheets("cbi_audit", items, cfg, assignment=assignment)
     assert pd.read_csv(path, dtype=str, keep_default_na=False).loc[0, "category"] == "model_error"
+
+
+def test_adjudication_sheet_has_only_the_disagreements_with_both_labels(cfg, items):
+    assignment = {"annotator_1": ["finqa:x", "finqa:y", "tatqa:z"], "annotator_2": ["finqa:x", "finqa:y"]}
+    export_sheets("cbi_audit", items, cfg, assignment=assignment)
+    rid = dict(pd.read_csv(task_dir(cfg, "cbi_audit") / KEY_FILE, dtype=str)[["item_id", "row_id"]].itertuples(index=False))
+    by_row = {"annotator_1": {rid["finqa:x"]: "model_error", rid["finqa:y"]: "questionable_gold", rid["tatqa:z"]: "scoring_artefact"},
+              "annotator_2": {rid["finqa:x"]: "model_error", rid["finqa:y"]: "ambiguous_question"}}
+    for a, lab in by_row.items():                                         # labels in each sheet's own row order
+        sent = pd.read_csv(task_dir(cfg, "cbi_audit") / f"{a}.csv", dtype=str, keep_default_na=False)
+        _return(cfg, a, [lab[r] for r in sent["row_id"]])
+    import_sheets("cbi_audit", cfg)                                       # validated labels, as the import writes them
+    path = cbi_audit.export_adjudication(cfg)[0]
+    sheet = pd.read_csv(path, dtype=str, keep_default_na=False)
+    assert list(sheet["row_id"]) == [rid["finqa:y"]]                       # agreed and single-annotated items left out
+    row = sheet.iloc[0]
+    assert (row["annotator_1_label"], row["annotator_2_label"]) == ("questionable_gold", "ambiguous_question")
+    assert row["category"] == "" and row["note"] == ""
+    original = pd.read_csv(task_dir(cfg, "cbi_audit") / "annotator_1.csv", dtype=str, keep_default_na=False).set_index("row_id")
+    for c in ["item_text", "gold_answer", "gold_derivation", "model_answer", "model_reasoning", "row_hash"]:
+        assert row[c] == original.loc[row["row_id"], c]                    # item shown exactly as before
+    first = path.read_bytes()
+    cbi_audit.export_adjudication(cfg)                                     # unlabelled: same bytes again
+    assert path.read_bytes() == first
+    sheet.loc[0, "category"] = "questionable_gold"                         # the third annotator has started
+    sheet.to_csv(path, index=False, quoting=csv.QUOTE_ALL)
+    with pytest.raises(AnnotationError, match="already has entries"):
+        cbi_audit.export_adjudication(cfg)
+
+
+def test_adjudication_import_gives_one_final_label_per_item(cfg, items):
+    assignment = {"annotator_1": ["finqa:x", "finqa:y", "tatqa:z"], "annotator_2": ["finqa:x", "finqa:y"]}
+    export_sheets("cbi_audit", items, cfg, assignment=assignment)
+    base = task_dir(cfg, "cbi_audit")
+    pd.DataFrame({"item_id": ["finqa:x", "finqa:y", "tatqa:z"], "stratum": ["A", "A", "B"],
+                  "cell": ["jev_sides_with_model", "jev_sides_with_model", "both_supported"]}).to_csv(base / "_design.csv", index=False)
+    rid = dict(pd.read_csv(base / KEY_FILE, dtype=str)[["item_id", "row_id"]].itertuples(index=False))
+    by_row = {"annotator_1": {rid["finqa:x"]: "model_error", rid["finqa:y"]: "questionable_gold", rid["tatqa:z"]: "scoring_artefact"},
+              "annotator_2": {rid["finqa:x"]: "model_error", rid["finqa:y"]: "ambiguous_question"}}
+    for a, lab in by_row.items():
+        sent = pd.read_csv(base / f"{a}.csv", dtype=str, keep_default_na=False)
+        _return(cfg, a, [lab[r] for r in sent["row_id"]])
+    import_sheets("cbi_audit", cfg)
+    path = cbi_audit.export_adjudication(cfg)[0]
+    with pytest.raises(AnnotationError, match="no returned adjudication file"):
+        cbi_audit.import_adjudication(cfg)
+    sheet = pd.read_csv(path, dtype=str, keep_default_na=False)
+    (path.parent / "returned").mkdir()
+    edited = sheet.assign(annotator_1_label="model_error", category="ambiguous_question")
+    edited.to_csv(path.parent / "returned" / path.name, index=False, quoting=csv.QUOTE_ALL)
+    with pytest.raises(AnnotationError, match="edited outside category and note"):   # earlier labels must stay as shown
+        cbi_audit.import_adjudication(cfg)
+    sheet.assign(category=" Ambiguous_Question ").to_csv(path.parent / "returned" / path.name, index=False, quoting=csv.QUOTE_ALL)
+    summary = cbi_audit.import_adjudication(cfg)
+    final = pd.read_parquet(base / "final_labels.parquet").set_index("item_id")
+    assert final["label"].to_dict() == {"finqa:x": "model_error", "finqa:y": "ambiguous_question", "tatqa:z": "scoring_artefact"}
+    assert final["source"].to_dict() == {"finqa:x": "agreed", "finqa:y": "adjudicated", "tatqa:z": "single"}
+    a = summary["by_stratum"]["A"]
+    assert a["n_items"] == 2 and a["labels"]["item_problem"]["n"] == 1 and a["labels"]["model_error"]["share"] == 0.5
+    lo, hi = a["labels"]["item_problem"]["wilson_95"]
+    assert lo < 0.5 < hi

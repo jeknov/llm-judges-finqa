@@ -164,10 +164,23 @@ The notebook's main limitation for Experiment 5 is that Jev may be built on a Qw
 
 The asymmetry (judging the gold works, judging the model's answer does not) holds for all four judges, including the generator judging its own answers (exactly at chance). The judges side with Qwen on largely the same items: overlaps with Jev are about twice what independent choice would give, 50 items (40 FinQA arithmetic) are shared by the three other-family judges, and the generator sides with its own answer on 41 of them. The generator is the most lenient judge but not distinctively self-favouring: it endorses its confident errors no more than Gemma (89% vs 88%), rejects the gold least often, and prefers its own answer over the gold no more often than Llama does.
 
-### 8. Human validation and audit — to do (no GPU; annotators needed)
+### 8. Human validation and audit — CBI audit done (31 Oct); Q3 check validation to do
 
 - **Q3 check validation** (100 items, acceptance ≥ 90%): required before any claim about Q3 or I.
 - **CBI hand audit** (sheets exported 26 Oct: 60 items, 30 per stratum, 20 double-annotated; `code/annotation/cbi_audit/`; originally planned at about 100 items): each item labelled *model error*, *scoring artefact*, *ambiguous or under-determined question*, or *questionable gold label*. The sample oversamples the 90 items where Jev sides with Qwen and also includes the 163 "both supported" and the 14 "clean catch" items. This is the CBI paper's recommended "Q4 mass on a small labelled sample". It decides how much of the CBI mass is model error and how much is item ambiguity or label noise. That decides the reading of Experiments 4 and 5, and it ties CBI to the determinacy construct.
+
+  **Results** (notebook 03 §11 and notebook 03b §6b; labels archived in `code/runs/cbi_audit_2026-10-31/`). Two annotators agreed on 14 of 20 double-labelled items (κ 0.60; 17 of 20, κ 0.77, with the two item-problem labels merged); a third annotator decided the 6 disagreements. Shares with Wilson 95% intervals:
+
+  | | Stratum A: Jev sides with Qwen (n = 30) | Stratum B: other CBI (n = 30) | All 281 CBI, weighted estimate |
+  | --- | --- | --- | --- |
+  | Model error | 23% [12, 41] | 17% [7, 34] | 19% [9, 28] |
+  | Item problem (questionable gold + ambiguous question) | **70%** [52, 83] | 17% [7, 34] | 34% [24, 43] |
+  | Scoring artefact | 7% [2, 21] | **67%** [49, 81] | 47% [36, 58] |
+
+  - **Most confident errors are not model errors:** about 53 of the 281 (3% of unanimous items, not the 16% automatic scoring reports).
+  - **A judge siding with the model flags bad items:** item problems are 70% in A against 17% in B (Fisher p < 0.001), and 65–70% for every judge of Experiment 7 where it sides with Qwen (weighted). Of the 15 audited items among the 50 shared by Jev, Llama and Gemma, 12 are item problems (80%).
+  - **A judge's doubt about the gold separates item problems from model errors** (AUROC 0.63–0.83 on the audited items); its support for the model's answer does not.
+  - **Scoring artefacts reach beyond the alternative scorers:** only 7 of the 22 would be counted correct by token-F1 ≥ 0.8 (bears on blocking question 5).
 
 ### Out of scope for this paper (future work)
 
